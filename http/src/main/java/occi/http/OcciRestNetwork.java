@@ -214,7 +214,13 @@ public class OcciRestNetwork extends ServerResource {
 					.parseInt((String) xoccimap.get("occi.network.vlan")),
 					null, null);
 			network.setKind(new Kind(null, "network", "network", null));
+			
 			StringBuffer resource = new StringBuffer();
+			String path = getRootRef().getPath();
+			if (path != null) {
+				resource.append(path);
+			}
+			
 			resource.append("/").append(network.getKind().getTerm())
 					.append("/");
 			getRootRef().setPath(resource.toString());

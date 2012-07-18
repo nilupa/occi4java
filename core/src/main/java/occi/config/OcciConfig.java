@@ -51,7 +51,7 @@ public class OcciConfig extends XMLConfiguration {
 	private OcciConfig() {
 		factory = new ConfigurationFactory();
 		// load configuration file
-		URL configURL = getClass().getResource("/conf/config.xml");
+		URL configURL = getClass().getResource("/config.xml");
 		factory.setConfigurationURL(configURL);
 		try {
 			// pick up configuration

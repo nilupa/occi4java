@@ -206,6 +206,10 @@ public class OcciRestStorage extends ServerResource {
 					.get("occi.storage.size")), State.offline, null, null);
 			storage.setKind(new Kind(null, "storage", "storage", null));
 			StringBuffer resource = new StringBuffer();
+			String path = getRootRef().getPath();
+			if (path != null) {
+				resource.append(path);
+			}
 			resource.append("/").append(storage.getKind().getTerm())
 					.append("/");
 			getRootRef().setPath(resource.toString());

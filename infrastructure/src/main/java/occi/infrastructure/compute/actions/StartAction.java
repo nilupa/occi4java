@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
  * @author Sebastian Laag
  */
 public class StartAction extends Action {
+	
 	private static final Logger LOGGER = LoggerFactory
 			.getLogger(StartAction.class);
 
@@ -69,12 +70,18 @@ public class StartAction extends Action {
 	@Override
 	public void execute(URI uri, Method start) {
 		LOGGER.debug("libvirt: Start");
+		
 		Compute compute = null;
 		String uriString = uri.toString();
-		if (uri.toString().endsWith("/")) {
-			uriString = uriString.substring(0, uri.toString().length() - 1);
-			uriString = uriString.substring(uriString.length() - 36);
-		}
+		
+//		if (uri.toString().endsWith("/")) {
+//			uriString = uriString.substring(0, uri.toString().length() - 1);
+//			uriString = uriString.substring(uriString.length() - 36);
+//		}
+		uriString = uriString.substring(0, uri.toString().length());
+		System.out.println(uriString.length());
+		uriString = uriString.substring(uriString.length() - 36);
+		
 		LOGGER.debug("URI " + uriString);
 		UUID computeUuid = UUID.fromString(uriString);
 		LOGGER.debug("UUID " + computeUuid.toString());

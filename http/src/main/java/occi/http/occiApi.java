@@ -32,11 +32,13 @@ public class occiApi extends ServerResource {
 	public static Component comp = new Component();
 
 	public static void main(String[] args) throws Exception {
+
 		// load all logger properties
 		if (new File("conf/log4j.properties").exists())
 			PropertyConfigurator.configure("conf/log4j.properties");
 		else
-			PropertyConfigurator.configure("../core/src/main/resources/conf/log4jTest.properties");
+			PropertyConfigurator
+					.configure("../core/src/main/resources/conf/log4jTest.properties");
 		// Create the HTTP server and listen on port 8182
 		comp.getServers().add(Protocol.HTTP,
 				OcciConfig.getInstance().config.getInt("occi.server.port"));

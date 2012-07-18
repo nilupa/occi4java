@@ -280,7 +280,7 @@ public class OcciCheck extends ServerResource {
 					if (!mixin.getTitle().equalsIgnoreCase("action")) {
 						category += mixin.getTitle() + "; scheme=\""
 								+ mixin.getScheme().toString()
-								+ "\"; class=\"mixin\";";
+								+ "\"; class="+mixin.getTerm()+";";
 					}
 
 				}

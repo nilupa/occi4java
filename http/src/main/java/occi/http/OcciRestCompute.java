@@ -126,11 +126,15 @@ public class OcciRestCompute extends ServerResource {
 				buffer.append(" occi.compute.state=").append("inactive");
 
 				Set<String> set = new HashSet<String>();
-				set.add("summary: ");
-				set.add(buffer.toString());
+				set.add("summary: ");				
 				set.add(requestHeaders.getFirstValue("scheme"));
+				Set<String> keySet = xoccimap.keySet();
+				for(String key : keySet) 
+				{
+					set.add(key+"="+xoccimap.get(key));
+				}
 				LOGGER.debug("Attribute set: " + set.toString());
-
+				
 				// create new Compute instance with the given attributes
 				Compute compute = new Compute(
 						Architecture.valueOf((String) xoccimap
@@ -201,6 +205,9 @@ public class OcciRestCompute extends ServerResource {
 				LOGGER.debug("splitURI length: " + splitURI.length);
 				UUID id = null;
 				for (String element : splitURI) {
+					if (element.contains("?")) {
+						element = element.substring(0, element.indexOf("?"));
+					}
 					if (OcciCheck.isUUID(element)) {
 						id = UUID.fromString(element);
 					}
@@ -230,8 +237,19 @@ public class OcciRestCompute extends ServerResource {
 						LOGGER.debug(xoccimap.toString());
 						compute.getStart().execute(URI.create(location),
 								Start.valueOf((String) xoccimap.get("method")));
-						// Set the current state of the compute resource
-						compute.setState(State.active);
+						// ///////////////////////////////////////////////////////////////////////////
+						// Set the current state of the compute resource.
+						// This modification was done due polling
+						// requirement of
+						// the OpenStack server which is used in proactive
+						// scheduler.
+						if (compute.getHostname().equalsIgnoreCase("VIRTUAL")) {
+							compute.setState(State.inactive);
+
+						} else {
+							compute.setState(State.active);
+						}
+						// ////////////////////////////////////////////////////////////////////////////
 					}
 
 					if (actionName[1].equalsIgnoreCase("stop")) {
@@ -246,8 +264,11 @@ public class OcciRestCompute extends ServerResource {
 					if (actionName[1].equalsIgnoreCase("restart")) {
 						LOGGER.debug("Restart Action called.");
 						// Call the Restart action of the compute resource
-						compute.getRestart().execute(URI.create(location), Restart
-								.valueOf((String) xoccimap.get("method")));
+						compute.getRestart()
+								.execute(
+										URI.create(location),
+										Restart.valueOf((String) xoccimap
+												.get("method")));
 						// Set the current state of the compute resource
 						compute.setState(State.active);
 					}
@@ -255,8 +276,11 @@ public class OcciRestCompute extends ServerResource {
 					if (actionName[1].equalsIgnoreCase("suspend")) {
 						LOGGER.debug("Suspend Action called.");
 						// Call the Suspend action of the compute resource
-						compute.getSuspend().execute(URI.create(location), Suspend
-								.valueOf((String) xoccimap.get("method")));
+						compute.getSuspend()
+								.execute(
+										URI.create(location),
+										Suspend.valueOf((String) xoccimap
+												.get("method")));
 						// Set the current state of the compute resource
 						compute.setState(State.suspended);
 					}
@@ -265,7 +289,7 @@ public class OcciRestCompute extends ServerResource {
 
 		} catch (ResourceException e) {
 			throw e;
-		}catch (Exception e) {
+		} catch (Exception e) {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
 			return "Exception caught: " + e.toString() + "\n";
@@ -287,8 +311,8 @@ public class OcciRestCompute extends ServerResource {
 					requestHeaders.toString()).get("accept");
 			OcciCheck.isUUID(getReference().getLastSegment());
 			// get the compute instance by the given UUID
-			Compute compute = Compute.getComputeList().get(UUID
-					.fromString(getReference().getLastSegment()));
+			Compute compute = Compute.getComputeList().get(
+					UUID.fromString(getReference().getLastSegment()));
 
 			// put all attributes into a buffer for the response
 			StringBuffer buffer = new StringBuffer();
@@ -303,7 +327,7 @@ public class OcciRestCompute extends ServerResource {
 					.append(compute.getSpeed()).append(" State: ")
 					.append(compute.getState());
 
-			if (! compute.getLinks().isEmpty()) {
+			if (!compute.getLinks().isEmpty()) {
 				linkBuffer.append(" Link: ");
 			}
 			for (Link l : compute.getLinks()) {
@@ -313,7 +337,8 @@ public class OcciRestCompute extends ServerResource {
 					for (Mixin mixin : Mixin.getMixins()) {
 						if (mixin instanceof IPNetworkInterface
 								&& mixin.getEntities() != null
-								&& mixin.getEntities().contains(networkInterface)) {
+								&& mixin.getEntities().contains(
+										networkInterface)) {
 							ipNetworkInterface = (IPNetworkInterface) mixin;
 						}
 					}
@@ -338,10 +363,11 @@ public class OcciRestCompute extends ServerResource {
 								+ "ipnetworkinterface\"");
 					}
 					linkBuffer.append(" occi.core.target=/"
-							+ networkInterface.getTarget().getKind().getTerm() + "/"
-							+ networkInterface.getTarget().getId());
+							+ networkInterface.getTarget().getKind().getTerm()
+							+ "/" + networkInterface.getTarget().getId());
 					linkBuffer.append(" occi.core.source=/"
-							+ compute.getKind().getTerm() + "/" + compute.getId());
+							+ compute.getKind().getTerm() + "/"
+							+ compute.getId());
 					linkBuffer.append(" occi.core.id="
 							+ networkInterface.getId());
 					linkBuffer.append(" occi.networkinterface.interface="
@@ -410,13 +436,13 @@ public class OcciRestCompute extends ServerResource {
 		try {
 			OcciCheck.isUUID(getReference().getLastSegment());
 			// get compute resource that should be deleted
-			Compute compute = Compute.getComputeList().get(UUID
-					.fromString(getReference().getLastSegment()));
+			Compute compute = Compute.getComputeList().get(
+					UUID.fromString(getReference().getLastSegment()));
 			DeleteAction deleteAction = new DeleteAction();
 			deleteAction.execute(new URI(compute.getId().toString()), null);
 			// remove it from compute resource list
-			if (Compute.getComputeList().remove(UUID.fromString(compute.getId()
-					.toString())) == null) {
+			if (Compute.getComputeList().remove(
+					UUID.fromString(compute.getId().toString())) == null) {
 				throw new Exception("There is no resorce with the given ID");
 			}
 			getResponse().setStatus(Status.SUCCESS_OK);
@@ -455,8 +481,8 @@ public class OcciRestCompute extends ServerResource {
 			getServerInfo().setAgent(
 					OcciConfig.getInstance().config.getString("occi.version"));
 			OcciCheck.isUUID(getReference().getLastSegment());
-			Compute compute = Compute.getComputeList().get(UUID
-					.fromString(getReference().getLastSegment()));
+			Compute compute = Compute.getComputeList().get(
+					UUID.fromString(getReference().getLastSegment()));
 			// access the request headers and get the X-OCCI-Attribute
 			Form requestHeaders = (Form) getRequest().getAttributes().get(
 					"org.restlet.http.headers");
@@ -539,9 +565,9 @@ public class OcciRestCompute extends ServerResource {
 			// Catch possible exceptions
 		} catch (ResourceException e) {
 			throw e;
-			
+
 		} catch (Exception e) {
-		
+
 			LOGGER.error("Exception caught: " + e.toString());
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
