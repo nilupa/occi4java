@@ -87,6 +87,8 @@ public class OSTemplate extends Mixin {
 	 */
 	public static HashSet<String> attributes = new HashSet<String>();
 	
+	private String term;
+	
 	/**
 	 * Generate attribute List.
 	 */
@@ -94,8 +96,17 @@ public class OSTemplate extends Mixin {
 		if (attributes.isEmpty()) {
 			// add all attributes to attribute list
 			attributes.add("procci.os_tpl.metadata.map");
+			attributes.add("procci.os_tpl.term");
 		}
 	}
-	
 
+	public String getTerm() {
+		return term;
+	}
+
+	public void setTerm(String term) {
+		this.term = term;
+	}
+	
+	
 }
