@@ -40,6 +40,7 @@ import occi.infrastructure.Storage;
 import occi.infrastructure.links.IPNetworkInterface;
 import occi.infrastructure.links.NetworkInterface;
 import occi.infrastructure.links.StorageLink;
+import occi.infrastructure.templates.OSTemplate;
 
 import org.restlet.data.Form;
 import org.restlet.data.Status;
@@ -64,7 +65,7 @@ public class OcciRestQuery extends ServerResource {
 	 */
 	private final List<Link> queryLinks = new LinkedList<Link>();
 
-	private static IPNetworkInterface ipNetworkInterface = null;
+	private final List<Mixin> queryMixin = new LinkedList<Mixin>();
 
 	/**
 	 * Returns all available resources.
@@ -179,19 +180,17 @@ public class OcciRestQuery extends ServerResource {
 		/*
 		 * Print all properties of the mixin instance
 		 */
-
-		if (ipNetworkInterface != null) {
-			buffer.append("Category: ").append(ipNetworkInterface.getTitle())
-					.append(";");
-			buffer.append("\t\t scheme=\"")
-					.append(ipNetworkInterface.getScheme()).append("\";");
+		for (Mixin mixin : queryMixin) {
+			buffer.append("Category: ").append(mixin.getTitle()).append(";");
+			buffer.append("\t\t scheme=\"").append(mixin.getScheme())
+					.append("\";");
 			buffer.append("\r\n");
 			buffer.append("\t\t class=\"mixin\"");
 			buffer.append("\r\n");
 			// append related scheme to buffer, if kind has a related
 			// kind
-			if (ipNetworkInterface.getRelated() != null) {
-				for (Mixin related : ipNetworkInterface.getRelated()) {
+			if (mixin.getRelated() != null) {
+				for (Mixin related : mixin.getRelated()) {
 					if (related != null) {
 						buffer.append("\t\t rel=").append(related.getScheme())
 								.append(";\n");
@@ -199,16 +198,16 @@ public class OcciRestQuery extends ServerResource {
 				}
 			}
 			buffer.append("\t\t attributes=\"");
-			if (ipNetworkInterface.getAttributes() != null) {
-				for (String attribute : ipNetworkInterface.getAttributes()) {
+			if (mixin.getAttributes() != null) {
+				for (String attribute : mixin.getAttributes()) {
 					if (attribute != null) {
 						buffer.append(attribute).append(" ");
 					}
 				}
 			}
 			buffer.append("\";\n");
-			buffer.append("\t\t location=/")
-					.append(ipNetworkInterface.getTerm()).append("/;");
+			buffer.append("\t\t location=/").append(mixin.getTerm())
+					.append("/;");
 			buffer.append("\r\n");
 		}
 
@@ -216,7 +215,7 @@ public class OcciRestQuery extends ServerResource {
 		 * Print all properties of the mixin instance
 		 */
 		for (Mixin mixin : Mixin.getMixins()) {
-			if (mixin != null && !mixin.getTerm().equals("ipnetwork")) {
+			if (mixin != null && !mixin.getTerm().equals("ipnetwork") && ! mixin.getTerm().equals("os_tpl")) {
 				buffer.append("Category: " + mixin.getTitle()).append(";");
 
 				buffer.append("\r\n");
@@ -340,21 +339,37 @@ public class OcciRestQuery extends ServerResource {
 	 */
 	private void createQueryMixins() {
 		IPNetworkInterface.generateAttributeList();
-		if (ipNetworkInterface == null) {
-			HashSet<Mixin> related = new HashSet<Mixin>();
-			try {
-				related.add(new Mixin(null, "ipnetwork", "ipnetwork",
-						"http://schemas.ogf.org/occi/core#link",
-						IPNetworkInterface.attributes));
-				ipNetworkInterface = new IPNetworkInterface(related,
-						"ipnetwork", "ipnetwork",
-						"http://schemas.ogf.org/occi/infrastructure/network#",
-						IPNetworkInterface.attributes);
-			} catch (SchemaViolationException e) {
-				e.printStackTrace();
-			} catch (URISyntaxException e) {
-				e.printStackTrace();
-			}
+		HashSet<Mixin> related = new HashSet<Mixin>();
+		try {
+			related.add(new Mixin(null, "ipnetwork", "ipnetwork",
+					"http://schemas.ogf.org/occi/core#link",
+					IPNetworkInterface.attributes));
+			IPNetworkInterface ipNetworkInterface = new IPNetworkInterface(
+					related, "ipnetwork", "ipnetwork",
+					"http://schemas.ogf.org/occi/infrastructure/network#",
+					IPNetworkInterface.attributes);
+			queryMixin.add(ipNetworkInterface);
+		} catch (SchemaViolationException e) {
+			e.printStackTrace();
+		} catch (URISyntaxException e) {
+			e.printStackTrace();
+		}
+		OSTemplate.generateAttributeList();
+		HashSet<Mixin> osRelated = new HashSet<Mixin>();
+		try {
+			osRelated.add(new Mixin(null, "os_tpl", "os_tpl",
+					"http://schemas.ogf.org/occi/infrastructure",
+					OSTemplate.attributes));
+			OSTemplate osTemplate = new OSTemplate(null, "os_tpl", "os_tpl",
+					"http://schemas.ogf.org/occi/infrastructure#os_tpl",
+					OSTemplate.attributes);
+			queryMixin.add(osTemplate);
+		} catch (SchemaViolationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (URISyntaxException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 
@@ -415,8 +430,8 @@ public class OcciRestQuery extends ServerResource {
 			// create a related Kind and add it to the list for the query
 			// interface
 			HashSet<Kind> relatedSet = new HashSet<Kind>();
-			Kind related = new Kind(null, null, null, null, "storage",
-					"storage", "http://schemas.ogf.org/occi/core#resource",
+			Kind related = new Kind(null, null, null, null, "compute",
+					"compute", "http://schemas.ogf.org/occi/core#resource",
 					null);
 			relatedSet.add(related);
 			// create compute kind and add to kind list
