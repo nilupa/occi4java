@@ -31,7 +31,7 @@ public class OcciCoreCheck {
 	public static void checkScheme(String scheme) throws SchemaViolationException {
 		if (scheme.contains(OcciConfig.getInstance().config
 				.getString("occi.scheme")) || scheme.contains(OcciConfig.getInstance().config
-						.getString("occi.scheme.alternative"))) {
+						.getString("occi.scheme.alternative")) || scheme.contains(OcciConfig.getInstance().config.getString("occi.scheme.procci"))) {
 			return;
 		} else {
 			throw new SchemaViolationException("Scheme " + scheme

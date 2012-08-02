@@ -133,6 +133,10 @@ public class Mixin extends Category {
 	 * @return entities
 	 */
 	public Set<Entity> getEntities() {
+		if(entities == null)
+		{
+			entities = new HashSet<Entity>();
+		}
 		return entities;
 	}
 

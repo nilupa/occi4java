@@ -96,6 +96,13 @@ public class OcciCheck extends ServerResource {
 		} else if (string.contains("accept,")) {
 			caseMap.put("accept", "accept");
 		}
+		if(string.contains("Link"))
+		{
+			caseMap.put("Link", "Link");
+		}
+		else if(string.contains("link")){
+			caseMap.put("Link", "link");
+		}
 
 		return caseMap;
 	}

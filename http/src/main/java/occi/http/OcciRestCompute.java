@@ -19,19 +19,26 @@
 package occi.http;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.UUID;
 
+import javax.naming.directory.SchemaViolationException;
+
 import occi.config.OcciConfig;
+import occi.core.Kind;
 import occi.core.Link;
 import occi.core.Mixin;
 import occi.http.check.OcciCheck;
 import occi.infrastructure.Compute;
+import occi.infrastructure.Network;
 import occi.infrastructure.Compute.Architecture;
 import occi.infrastructure.Compute.State;
+import occi.infrastructure.Storage;
 import occi.infrastructure.compute.actions.CreateAction;
 import occi.infrastructure.compute.actions.DeleteAction;
 import occi.infrastructure.compute.actions.RestartAction.Restart;
@@ -40,6 +47,9 @@ import occi.infrastructure.compute.actions.StopAction.Stop;
 import occi.infrastructure.compute.actions.SuspendAction.Suspend;
 import occi.infrastructure.links.IPNetworkInterface;
 import occi.infrastructure.links.NetworkInterface;
+import occi.infrastructure.links.StorageLink;
+import occi.infrastructure.templates.OSTemplate;
+import occi.infrastructure.templates.sla.SlaTemplate;
 
 import org.restlet.Response;
 import org.restlet.data.Form;
@@ -60,6 +70,251 @@ public class OcciRestCompute extends ServerResource {
 			.getLogger(OcciRestCompute.class);
 
 	private final OcciCheck occiCheck = new OcciCheck();
+	private IPNetworkInterface ipNetworkInterface = null;
+
+	private void createLinks(Form requestHeaders, Compute compute,
+			StringBuffer buffer) {
+		String linkCase = OcciCheck.checkCaseSensitivity(
+				requestHeaders.toString()).get("Link");
+		for (String valueString : requestHeaders.getValuesArray(linkCase)) {
+			String[] spiltString = valueString.split(";");
+			Map<String, String> valueMap = new HashMap<String, String>();
+			for (String str : spiltString) {
+				String[] spiltArrayOfEqualSign = str.split("=");
+				if (spiltArrayOfEqualSign.length == 2) {
+					String strWithoutDoubleQuote = spiltArrayOfEqualSign[1]
+							.replace("\"", "");
+					valueMap.put(spiltArrayOfEqualSign[0].trim(),
+							strWithoutDoubleQuote.trim());
+				} else {
+					String[] linkUUID = str.replaceAll("</[\\w]+/", "").split(
+							">");
+					if (str.contains("network")) {
+						valueMap.put("network.id", linkUUID[0]);
+
+					} else if (str.contains("storage")) {
+						valueMap.put("storage.id", linkUUID[0]);
+					}
+				}
+			}
+			if (valueMap.get("rel").equals(
+					"http://schemas.ogf.org/occi/infrastructure#network")
+					&& valueMap
+							.get("category")
+							.equals("http://schemas.ogf.org/occi/infrastructure#networkinterface")) {
+				try {
+					if (valueMap.get("occi.networkinterface.interface") == null) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new RuntimeException(
+								"'occi.networkinterface.interface' value not found");
+					}
+					if (valueMap.get("occi.networkinterface.mac") == null) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new RuntimeException(
+								"'occi.networkinterface.mac' value not found");
+					}
+					NetworkInterface networkInterface = new NetworkInterface(
+							valueMap.get("occi.networkinterface.interface")
+									.toString(),
+							valueMap.get("occi.networkinterface.mac")
+									.toString(),
+							occi.infrastructure.links.NetworkInterface.State.inactive,
+							Network.getNetworkList()
+									.get(UUID.fromString(valueMap
+											.get("network.id"))), compute);
+					networkInterface.getLink().setTitle("network link");
+					compute.getLinks().add(networkInterface);
+					LOGGER.debug("NetworkInterface UUID: "
+							+ networkInterface.getId().toString()
+							+ networkInterface.getNetworkInterface());
+					if (ipNetworkInterface != null) {
+
+					}
+
+					buffer.append("occi.networkinterface.interface=").append(
+							valueMap.get("occi.networkinterface.interface"));
+					buffer.append("occi.networkinterface.mac=").append(
+							valueMap.get("occi.networkinterface.mac"));
+				} catch (SchemaViolationException e) {
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					throw new IllegalArgumentException(
+							"Schema violation Exception");
+				} catch (URISyntaxException e) {
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					throw new IllegalArgumentException("URI Syntax Error");
+				}
+
+			} else if (valueMap.get("rel").equals(
+					"http://schemas.ogf.org/occi/infrastructure#storage")
+					&& valueMap
+							.get("category")
+							.equals("http://schemas.ogf.org/occi/infrastructure#storagelink")) {
+				if (valueMap.get("occi.storagelink.deviceid") == null) {
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					throw new RuntimeException(
+							" 'occi.storagelink.deviceid' value not found");
+				} else if (valueMap.get("occi.storagelink.mountpoint") == null) {
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					throw new RuntimeException(
+							"'occi.storagelink.mountpoint' value not found");
+				}
+				try {
+					StorageLink storageLink = new StorageLink(
+							valueMap.get("occi.storagelink.deviceid")
+									.toString(),
+							occi.infrastructure.links.StorageLink.State.inactive,
+							valueMap.get("occi.storagelink.mountpoint"),
+							Storage.getStorageList().get(
+									UUID.fromString("storage.id")), compute);
+					storageLink.getLink().setTitle("storage link");
+					compute.getLinks().add(storageLink);
+					LOGGER.debug("StorageLink UUID: "
+							+ storageLink.getId().toString());
+				} catch (URISyntaxException e) {
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					throw new IllegalArgumentException("URI Syntax Error");
+				}
+
+			}
+		}
+	}
+
+	/**
+	 * Adds the applicable mixins which is coming with the HTTP request.
+	 * Applicable mixins are defined in the OcciRestQuery.java
+	 * 
+	 * @param representation
+	 * @param compute
+	 */
+	private void createMixinsForOSTempletesAndSLA(Form requestHeaders,
+			Compute compute, HashMap<String, Object> xoccimap,
+			StringBuffer buffer) {
+		// access the request headers and get the Category
+		for (String categoryString : requestHeaders.getValuesArray("Category")) {
+			String[] splitArray = categoryString.split(";");
+			if (!splitArray[0].equals("compute")) {
+				String category = null;
+				String scheme = null;
+				String title = null;
+				Map<String, String> valueMap = new HashMap<String, String>();
+				String className = "";
+				for (String str : splitArray) {
+					String[] splitByEqualArray = str.split("=");
+					if (splitByEqualArray.length == 2) {
+						String stringWithoutDoubleQuote = splitByEqualArray[1]
+								.replace("\"", "");
+						valueMap.put(splitByEqualArray[0].trim(),
+								stringWithoutDoubleQuote.trim());
+					} else {
+						valueMap.put("category", splitByEqualArray[0].trim());
+					}
+
+				}
+				for (Map.Entry<String, String> entry : valueMap.entrySet()) {
+
+					if (entry.getKey().equals("category")) {
+						category = entry.getValue().trim();
+					} else if (entry.getKey().equals("scheme")) {
+						scheme = entry.getValue().trim();
+					} else if (entry.getKey().equals("class")) {
+						className = entry.getValue().trim();
+					} else if (entry.getKey().equals("title")) {
+						title = entry.getValue().trim();
+					}
+
+				}
+				if (title == null) {
+					title = category;
+				}
+				if (className.equals("mixin")
+						&& category.equals("os_tpl")
+						&& scheme
+								.equals("http://schemas.ogf.org/occi/infrastucture#")) {
+					try {
+						Kind kindOSTemplate = new Kind(null, null, null, null,
+								"os_tpl", title, scheme, null);
+						compute.getMixins().add(kindOSTemplate);
+						OSTemplate osTemplate = new OSTemplate(null, category,
+								title, scheme, null);
+						if (xoccimap.get("occi.os_tpl.term") == null) {
+							getResponse().setStatus(
+									Status.CLIENT_ERROR_BAD_REQUEST);
+							throw new RuntimeException(
+									"'occi.os_tpl.value' not found");
+
+						}
+						osTemplate.setOsTerm(xoccimap.get("occi.os_tpl.term")
+								.toString());
+						buffer.append(" occi.os_tpl.term=").append(
+								xoccimap.get("occi.os_tpl.term").toString());
+						osTemplate.getEntities().add(compute);
+					} catch (SchemaViolationException e) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new IllegalArgumentException(
+								"Schema violation Exception");
+					} catch (URISyntaxException e) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new IllegalArgumentException("URI Sysntax Error");
+					}
+				} else if (className.equals("mixin")
+						&& category.equals("sla")
+						&& scheme
+								.equals("http://proactive/occi/procci.resource_tpl.sla/infrastucture#")) {
+
+					try {
+						Kind slaTemplate = new Kind(null, null, null, null,
+								"sla", title, scheme, null);
+						compute.getMixins().add(slaTemplate);
+						SlaTemplate template = new SlaTemplate(null, category,
+								title, scheme, null);
+						if (xoccimap.get("occi.resource_tpl.sla") == null) {
+							getResponse().setStatus(
+									Status.CLIENT_ERROR_BAD_REQUEST);
+							throw new RuntimeException(
+									"'occi.resource_tpl.sla' value not found");
+
+						}
+						template.setSlaName(xoccimap.get(
+								"occi.resource_tpl.sla").toString());
+						buffer.append(" occi.resource_tpl.sla=").append(
+								xoccimap.get("occi.resource_tpl.sla")
+										.toString());
+						template.getEntities().add(compute);
+					} catch (SchemaViolationException e) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new IllegalArgumentException(
+								"Schema violation Exception");
+					} catch (URISyntaxException e) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new IllegalArgumentException("URI Syntax Error");
+					}
+
+				} else if (className.equals("mixin")
+						&& category.equals("ipnetworkinterface")
+						&& scheme
+								.equals("http://schemas.ogf.org/occi/infrastructure/networkinterface#")) {
+//					IPNetworkInterface ipNetworkInterface = new IPNetworkInterface(
+//							null,
+//							category,
+//							title,
+//							scheme,
+//							IPNetworkInterface.attributes);
+//					ipNetworkInterface.setIp(xoccimap.get(""));
+//					ipNetworkInterface.setGateway(PAOCCIConfig.getInstance()
+//							.getGatewayIPAddress());
+//					ipNetworkInterface
+//							.setAllocation(IPNetworkInterface.Allocation.DYNAMIC);
+
+				}
+			}
+		}
+	}
 
 	/**
 	 * Method to create a new compute instance.
@@ -126,15 +381,14 @@ public class OcciRestCompute extends ServerResource {
 				buffer.append(" occi.compute.state=").append("inactive");
 
 				Set<String> set = new HashSet<String>();
-				set.add("summary: ");				
+				set.add("summary: ");
 				set.add(requestHeaders.getFirstValue("scheme"));
 				Set<String> keySet = xoccimap.keySet();
-				for(String key : keySet) 
-				{
-					set.add(key+"="+xoccimap.get(key));
+				for (String key : keySet) {
+					set.add(key + "=" + xoccimap.get(key));
 				}
 				LOGGER.debug("Attribute set: " + set.toString());
-				
+
 				// create new Compute instance with the given attributes
 				Compute compute = new Compute(
 						Architecture.valueOf((String) xoccimap
@@ -147,7 +401,9 @@ public class OcciRestCompute extends ServerResource {
 						Float.parseFloat((String) xoccimap
 								.get("occi.compute.memory")), State.inactive,
 						set);
-
+				createLinks(requestHeaders, compute, buffer);
+				createMixinsForOSTempletesAndSLA(requestHeaders, compute,
+						xoccimap, buffer);
 				URI uri = new URI(compute.getId().toString());
 				// Create libvirt domain
 				CreateAction createAction = new CreateAction();
@@ -292,6 +548,7 @@ public class OcciRestCompute extends ServerResource {
 		} catch (Exception e) {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
+			e.printStackTrace();
 			return "Exception caught: " + e.toString() + "\n";
 		}
 		return " ";
@@ -366,8 +623,8 @@ public class OcciRestCompute extends ServerResource {
 							+ networkInterface.getTarget().getKind().getTerm()
 							+ "/" + networkInterface.getTarget().getId());
 					linkBuffer.append(" occi.core.source=/"
-							+ compute.getKind().getTerm() + "/"
-							+ compute.getId());
+							+ networkInterface.getLink().getKind().getTerm()
+							+ "/" + compute.getId());
 					linkBuffer.append(" occi.core.id="
 							+ networkInterface.getId());
 					linkBuffer.append(" occi.networkinterface.interface="

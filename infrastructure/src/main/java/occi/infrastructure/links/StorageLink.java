@@ -58,7 +58,7 @@ public class StorageLink extends Link {
 	/**
 	 * Possible status of the instance.
 	 */
-	private enum State {
+	public enum State {
 		active, inactive
 	}
 

@@ -163,6 +163,9 @@ public abstract class Entity {
 	 * @return mixins
 	 */
 	public final Set<Kind> getMixins() {
+		if(mixins == null){
+			mixins = new HashSet<Kind>();
+		}
 		return mixins;
 	}
 

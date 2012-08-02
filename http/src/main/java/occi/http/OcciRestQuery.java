@@ -215,28 +215,32 @@ public class OcciRestQuery extends ServerResource {
 		 * Print all properties of the mixin instance
 		 */
 		for (Mixin mixin : Mixin.getMixins()) {
-			if (mixin != null && !mixin.getTerm().equals("ipnetwork") && ! mixin.getTerm().equals("os_tpl")) {
-				buffer.append("Category: " + mixin.getTitle()).append(";");
+			if (mixin != null) {
+				if (!mixin.getTerm().equals("ipnetwork")
+						&& !mixin.getTerm().equals("os_tpl")) {
+					buffer.append("Category: " + mixin.getTitle()).append(";");
 
-				buffer.append("\r\n");
-				buffer.append("\t\t class=\"mixin\"");
-				buffer.append("\r\n");
-				// append related scheme to buffer, if kind has a related
-				// kind
-				if (mixin.getRelated() != null) {
-					for (Mixin related : mixin.getRelated()) {
-						if (related != null) {
-							buffer.append("\t\t rel=")
-									.append(related.getScheme()).append(";\n");
+					buffer.append("\r\n");
+					buffer.append("\t\t class=\"mixin\"");
+					buffer.append("\r\n");
+					// append related scheme to buffer, if kind has a related
+					// kind
+					if (mixin.getRelated() != null) {
+						for (Mixin related : mixin.getRelated()) {
+							if (related != null) {
+								buffer.append("\t\t rel=")
+										.append(related.getScheme())
+										.append(";\n");
+							}
 						}
 					}
+					buffer.append("\t\t scheme=").append(mixin.getScheme())
+							.append(";");
+					buffer.append("\r\n");
+					buffer.append("\t\t location=/").append(mixin.getTerm())
+							.append("/;");
+					buffer.append("\r\n");
 				}
-				buffer.append("\t\t scheme=").append(mixin.getScheme())
-						.append(";");
-				buffer.append("\r\n");
-				buffer.append("\t\t location=/").append(mixin.getTerm())
-						.append("/;");
-				buffer.append("\r\n");
 			}
 		}
 		buffer.append("\r\n");
@@ -360,9 +364,8 @@ public class OcciRestQuery extends ServerResource {
 			osRelated.add(new Mixin(null, "os_tpl", "os_tpl",
 					"http://schemas.ogf.org/occi/infrastructure",
 					OSTemplate.attributes));
-			OSTemplate osTemplate = new OSTemplate(null, "os_tpl", "os_tpl",
-					"http://schemas.ogf.org/occi/infrastructure#os_tpl",
-					OSTemplate.attributes);
+			OSTemplate osTemplate = new OSTemplate(null,
+					"os_tpl", "os_tpl", "http://schemas.ogf.org/occi/infrastructure#os_tpl", OSTemplate.attributes);
 			queryMixin.add(osTemplate);
 		} catch (SchemaViolationException e) {
 			// TODO Auto-generated catch block

@@ -93,7 +93,7 @@ public class Compute extends Resource {
 	 * Static Hashmap of all Compute Resources. The Key is a UUID, the Value a
 	 * Compute Object.
 	 */
-	private static Map<UUID, Compute> computeList = new HashMap<UUID, Compute>();
+	private static final Map<UUID, Compute> computeList = new HashMap<UUID, Compute>();
 
 	/**
 	 * Static HashSet of all compute attributes.
@@ -134,7 +134,7 @@ public class Compute extends Resource {
 
 		// check if all attributes are correct
 		if ((cores < 1)) {
-			throw new NumberFormatException("Number of cores is negative!");
+			throw new NumberFormatException("Number of cores should not be less than 1!");
 		} else if (speed < 0) {
 			throw new NumberFormatException("Number of speed is negative!");
 		} else if (memory < 0) {
@@ -176,9 +176,9 @@ public class Compute extends Resource {
 	 * 
 	 * @param computeList
 	 */
-	public static final void setComputeList(Map<UUID, Compute> computeList) {
-		Compute.computeList = computeList;
-	}
+//	public static final void setComputeList(Map<UUID, Compute> computeList) {
+//		Compute.computeList = computeList;
+//	}
 
 	/**
 	 * Returns the current UUID as a UUID Value

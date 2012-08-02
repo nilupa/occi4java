@@ -34,26 +34,16 @@
 package occi.infrastructure.templates;
 
 import java.net.URISyntaxException;
-import java.util.HashSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 
 import javax.naming.directory.SchemaViolationException;
 
-import occi.core.Action;
-import occi.core.Entity;
 import occi.core.Mixin;
 
 public class OSTemplate extends Mixin {
 
-	public OSTemplate(Set<Action> actions, Set<Mixin> related,
-			Set<Entity> entities) throws URISyntaxException,
-			SchemaViolationException {
-		super(actions, related, entities);
-		metaDataMap = new HashMap<String, String>();
-		generateAttributeList();
-	}
-	
 	/**
 	 * Constructor for the query interface. Necessary.
 	 * 
@@ -67,14 +57,20 @@ public class OSTemplate extends Mixin {
 			String scheme, Set<String> attributes)
 			throws SchemaViolationException, URISyntaxException {
 		super(related, term, title, scheme, attributes);
+		metaDataMap = new HashMap<String, String>();
 		generateAttributeList();
 	}
 
 	/**
 	 * Map containing meta data values
 	 */
-	private HashMap<String, String> metaDataMap;	
+	private HashMap<String, String> metaDataMap;
 	
+	/**
+	 * Image configuration value
+	 */
+	private String osTerm;
+
 	/**
 	 * Returns Hash map which contains meta data
 	 */
@@ -86,9 +82,7 @@ public class OSTemplate extends Mixin {
 	 * Static HashSet of all OS template attributes.
 	 */
 	public static HashSet<String> attributes = new HashSet<String>();
-	
-	private String term;
-	
+
 	/**
 	 * Generate attribute List.
 	 */
@@ -96,17 +90,17 @@ public class OSTemplate extends Mixin {
 		if (attributes.isEmpty()) {
 			// add all attributes to attribute list
 			attributes.add("procci.os_tpl.metadata.map");
-			attributes.add("procci.os_tpl.term");
+			attributes.add("occi.os_tpl.term");
 		}
 	}
 
-	public String getTerm() {
-		return term;
+	public String getOsTerm() {
+		return osTerm;
 	}
 
-	public void setTerm(String term) {
-		this.term = term;
+	public void setOsTerm(String osTerm) {
+		this.osTerm = osTerm;
 	}
 	
-	
+
 }
