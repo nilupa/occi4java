@@ -22,6 +22,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -35,9 +36,9 @@ import occi.core.Link;
 import occi.core.Mixin;
 import occi.http.check.OcciCheck;
 import occi.infrastructure.Compute;
-import occi.infrastructure.Network;
 import occi.infrastructure.Compute.Architecture;
 import occi.infrastructure.Compute.State;
+import occi.infrastructure.Network;
 import occi.infrastructure.Storage;
 import occi.infrastructure.compute.actions.CreateAction;
 import occi.infrastructure.compute.actions.DeleteAction;
@@ -129,14 +130,22 @@ public class OcciRestCompute extends ServerResource {
 					LOGGER.debug("NetworkInterface UUID: "
 							+ networkInterface.getId().toString()
 							+ networkInterface.getNetworkInterface());
-					if (ipNetworkInterface != null) {
-
-					}
-
 					buffer.append("occi.networkinterface.interface=").append(
 							valueMap.get("occi.networkinterface.interface"));
 					buffer.append("occi.networkinterface.mac=").append(
 							valueMap.get("occi.networkinterface.mac"));
+					if (ipNetworkInterface != null) {
+						ipNetworkInterface.getEntities().add(networkInterface);
+						networkInterface.getMixins().add(
+								new Kind(null, "ipnetworkinterface",
+										"ipnetworkinterface", null));
+						buffer.append("occi.network.address=").append(
+								ipNetworkInterface.getIp());
+						buffer.append("occi.network.gateway=").append(
+								ipNetworkInterface.getGateway());
+						buffer.append("occi.network.allocation=").append(
+								ipNetworkInterface.getAllocation());
+					}
 				} catch (SchemaViolationException e) {
 					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
 					throw new IllegalArgumentException(
@@ -299,17 +308,26 @@ public class OcciRestCompute extends ServerResource {
 						&& category.equals("ipnetworkinterface")
 						&& scheme
 								.equals("http://schemas.ogf.org/occi/infrastructure/networkinterface#")) {
-//					IPNetworkInterface ipNetworkInterface = new IPNetworkInterface(
-//							null,
-//							category,
-//							title,
-//							scheme,
-//							IPNetworkInterface.attributes);
-//					ipNetworkInterface.setIp(xoccimap.get(""));
-//					ipNetworkInterface.setGateway(PAOCCIConfig.getInstance()
-//							.getGatewayIPAddress());
-//					ipNetworkInterface
-//							.setAllocation(IPNetworkInterface.Allocation.DYNAMIC);
+					try {
+						IPNetworkInterface ipNetworkInterface = new IPNetworkInterface(
+								null, category, title, scheme,
+								IPNetworkInterface.attributes);
+						ipNetworkInterface.setIp(xoccimap.get(
+								"occi.networkinterface.address").toString());
+						ipNetworkInterface.setGateway(xoccimap.get(
+								"occi.networkinterface.gateway").toString());
+						ipNetworkInterface
+								.setAllocation(IPNetworkInterface.Allocation.DYNAMIC);
+						this.ipNetworkInterface = ipNetworkInterface;
+					} catch (SchemaViolationException e) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new IllegalArgumentException("URI Syntax Error");
+					} catch (URISyntaxException e) {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						throw new IllegalArgumentException("URI Syntax Error");
+					}
 
 				}
 			}
@@ -428,6 +446,7 @@ public class OcciRestCompute extends ServerResource {
 				for (Mixin mixin : Mixin.getMixins()) {
 					if (mixin.getEntities() != null) {
 						if (mixin.getEntities().contains(compute)) {
+							buffer.append(" ");
 							buffer.append("Category: " + mixin.getTitle()
 									+ "; scheme=\"" + mixin.getScheme()
 									+ "\"; class=\"mixin\"");
@@ -566,105 +585,169 @@ public class OcciRestCompute extends ServerResource {
 					"org.restlet.http.headers");
 			String acceptCase = OcciCheck.checkCaseSensitivity(
 					requestHeaders.toString()).get("accept");
-			OcciCheck.isUUID(getReference().getLastSegment());
-			// get the compute instance by the given UUID
-			Compute compute = Compute.getComputeList().get(
-					UUID.fromString(getReference().getLastSegment()));
-
 			// put all attributes into a buffer for the response
 			StringBuffer buffer = new StringBuffer();
-			StringBuffer linkBuffer = new StringBuffer();
-			buffer.append(" Category: ").append(compute.getKind().getTerm())
-					.append(" scheme= ").append(compute.getKind().getScheme())
-					.append(" class=\"kind\";").append(" Architecture: ")
-					.append(compute.getArchitecture()).append(" Cores: ")
-					.append(compute.getCores()).append(" Hostname: ")
-					.append(compute.getHostname()).append(" Memory: ")
-					.append(compute.getMemory()).append(" Speed: ")
-					.append(compute.getSpeed()).append(" State: ")
-					.append(compute.getState());
+			Representation representation = null;
+			if (!getReference().getLastSegment().equals("compute")) {
+				OcciCheck.isUUID(getReference().getLastSegment());
+				// get the compute instance by the given UUID
+				Compute compute = Compute.getComputeList().get(
+						UUID.fromString(getReference().getLastSegment()));
 
-			if (!compute.getLinks().isEmpty()) {
-				linkBuffer.append(" Link: ");
-			}
-			for (Link l : compute.getLinks()) {
-				if (l instanceof NetworkInterface) {
-					NetworkInterface networkInterface = (NetworkInterface) l;
-					IPNetworkInterface ipNetworkInterface = null;
-					for (Mixin mixin : Mixin.getMixins()) {
-						if (mixin instanceof IPNetworkInterface
-								&& mixin.getEntities() != null
-								&& mixin.getEntities().contains(
-										networkInterface)) {
-							ipNetworkInterface = (IPNetworkInterface) mixin;
+				// put all attributes into a buffer for the response
+				StringBuffer linkBuffer = new StringBuffer();
+				StringBuffer mixinBuffer = new StringBuffer();
+				// put all attributes into a buffer for the response
+				buffer.append(" Category: ")
+						.append(compute.getKind().getTerm())
+						.append(" scheme= ")
+						.append(compute.getKind().getScheme())
+						.append(" class=\"kind\";").append(" Architecture: ")
+						.append(compute.getArchitecture()).append(" Cores: ")
+						.append(compute.getCores()).append(" Hostname: ")
+						.append(compute.getHostname()).append(" Memory: ")
+						.append(compute.getMemory()).append(" Speed: ")
+						.append(compute.getSpeed()).append(" State: ")
+						.append(compute.getState());
+
+				if (!compute.getLinks().isEmpty()) {
+					linkBuffer.append(" Link: ");
+				}
+				for (Link l : compute.getLinks()) {
+					if (l instanceof NetworkInterface) {
+						NetworkInterface networkInterface = (NetworkInterface) l;
+						IPNetworkInterface ipNetworkInterface = null;
+						for (Mixin mixin : Mixin.getMixins()) {
+							if (mixin instanceof IPNetworkInterface
+									&& mixin.getEntities() != null
+									&& mixin.getEntities().contains(
+											networkInterface)) {
+								ipNetworkInterface = (IPNetworkInterface) mixin;
+							}
+						}
+						linkBuffer.append("</");
+						linkBuffer.append(l.getLink().getKind().getTerm());
+						linkBuffer.append("/");
+						linkBuffer.append(l.getId());
+						linkBuffer.append(">; ");
+						linkBuffer.append("rel=\""
+								+ l.getLink().getKind().getScheme());
+						linkBuffer.append(l.getLink().getKind().getTerm());
+						linkBuffer.append("\"");
+						linkBuffer.append(" self=\"/link/");
+						linkBuffer.append("networkinterface/");
+						linkBuffer.append(networkInterface.getId() + "\";");
+						linkBuffer.append(" category=\"");
+						linkBuffer.append(l.getLink().getKind().getScheme()
+								+ "networkinterface\";");
+						if (ipNetworkInterface != null) {
+							linkBuffer.append(" category=\"");
+							linkBuffer.append(ipNetworkInterface.getScheme()
+									+ "ipnetworkinterface\"");
+						}
+						linkBuffer.append(" occi.core.target=/"
+								+ networkInterface.getTarget().getKind()
+										.getTerm() + "/"
+								+ networkInterface.getTarget().getId());
+						linkBuffer.append(" occi.core.source=/"
+								+ networkInterface.getLink().getKind()
+										.getTerm() + "/" + compute.getId());
+						linkBuffer.append(" occi.core.id="
+								+ networkInterface.getId());
+						linkBuffer.append(" occi.networkinterface.interface="
+								+ networkInterface.getNetworkInterface());
+						linkBuffer.append(" occi.networkinterface.mac="
+								+ networkInterface.getMac());
+						linkBuffer.append(" occi.networkinterface.state="
+								+ networkInterface.getState());
+						if (ipNetworkInterface != null) {
+							linkBuffer.append(" occi.networkinterface.address="
+									+ ipNetworkInterface.getIp());
+							linkBuffer.append(" occi.networkinterface.gateway="
+									+ ipNetworkInterface.getGateway());
+							linkBuffer
+									.append(" occi.networkinterface.allocation="
+											+ ipNetworkInterface
+													.getAllocation());
+						}
+
+					}
+					buffer.append(linkBuffer);					
+					LOGGER.debug("Links: " + linkBuffer.toString());
+				}
+				for (Mixin mixin : Mixin.getMixins()) {
+					if (mixin.getEntities() != null) {
+						if (mixin.getEntities().contains(compute)) {
+							mixinBuffer.append(" ");
+							mixinBuffer.append("Category: " + mixin.getTitle()
+									+ "; scheme=\"" + mixin.getScheme()
+									+ "\"; class=\"mixin\"");
+							if(mixin instanceof OSTemplate)
+							{
+								OSTemplate osTemplate = (OSTemplate)mixin;
+								mixinBuffer.append("occi.os_tpl.term: "+osTemplate.getOsTerm());
+							}
+							else if(mixin instanceof SlaTemplate){
+								SlaTemplate slaTemplate = (SlaTemplate)mixin;
+								mixinBuffer.append("occi.resource_tpl.sla: "+slaTemplate.getSlaName());
+							}
 						}
 					}
-					linkBuffer.append("</");
-					linkBuffer.append(l.getLink().getKind().getTerm());
-					linkBuffer.append("/");
-					linkBuffer.append(l.getId());
-					linkBuffer.append(">; ");
-					linkBuffer.append("rel=\""
-							+ l.getLink().getKind().getScheme());
-					linkBuffer.append(l.getLink().getKind().getTerm());
-					linkBuffer.append("\"");
-					linkBuffer.append(" self=\"/link/");
-					linkBuffer.append("networkinterface/");
-					linkBuffer.append(networkInterface.getId() + "\";");
-					linkBuffer.append(" category=\"");
-					linkBuffer.append(l.getLink().getKind().getScheme()
-							+ "networkinterface\";");
-					if (ipNetworkInterface != null) {
-						linkBuffer.append(" category=\"");
-						linkBuffer.append(ipNetworkInterface.getScheme()
-								+ "ipnetworkinterface\"");
-					}
-					linkBuffer.append(" occi.core.target=/"
-							+ networkInterface.getTarget().getKind().getTerm()
-							+ "/" + networkInterface.getTarget().getId());
-					linkBuffer.append(" occi.core.source=/"
-							+ networkInterface.getLink().getKind().getTerm()
-							+ "/" + compute.getId());
-					linkBuffer.append(" occi.core.id="
-							+ networkInterface.getId());
-					linkBuffer.append(" occi.networkinterface.interface="
-							+ networkInterface.getNetworkInterface());
-					linkBuffer.append(" occi.networkinterface.mac="
-							+ networkInterface.getMac());
-					linkBuffer.append(" occi.networkinterface.state="
-							+ networkInterface.getState());
-					if (ipNetworkInterface != null) {
-						linkBuffer.append(" occi.networkinterface.address="
-								+ ipNetworkInterface.getIp());
-						linkBuffer.append(" occi.networkinterface.gateway="
-								+ ipNetworkInterface.getGateway());
-						linkBuffer.append(" occi.networkinterface.allocation="
-								+ ipNetworkInterface.getAllocation());
-					}
-
 				}
-				buffer.append(linkBuffer);
-
-				LOGGER.debug("Links: " + linkBuffer.toString());
-			}
-
-			// access the request headers and get the Accept attribute
-			Representation representation = OcciCheck.checkContentType(
-					requestHeaders, buffer, getResponse());
-			// Check the accept header
-			if (requestHeaders.getFirstValue(acceptCase).equals("text/occi")) {
-				// generate header rendering
-				this.occiCheck.setHeaderRendering(null, compute,
-						buffer.toString(), linkBuffer);
+				buffer.append(mixinBuffer);
+				LOGGER.debug("Mixin: "+ mixinBuffer);
+				// access the request headers and get the Accept attribute
+				representation = OcciCheck.checkContentType(
+						requestHeaders, buffer, getResponse());
+				// Check the accept header
+				if (requestHeaders.getFirstValue(acceptCase)
+						.equals("text/occi")) {
+					// generate header rendering
+					this.occiCheck.setHeaderRendering(null, compute,
+							buffer.toString(), linkBuffer);
+					// set right representation and status code
+					getResponse().setEntity(representation);
+					getResponse().setStatus(Status.SUCCESS_OK);
+					return " ";
+				}
 				// set right representation and status code
 				getResponse().setEntity(representation);
-				getResponse().setStatus(Status.SUCCESS_OK);
+				getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
+				return buffer.toString();
+			} else {
+				// initialize compute list
+				Map<UUID, Compute> computeList = Compute.getComputeList();
+				Compute compute = null;
+				// iterate through all available compute resources
+				int i = 1;
+				for (UUID id : computeList.keySet()) {
+					compute = computeList.get(id);
+					buffer.append(getReference());
+					buffer.append(compute.getId());
+					if (i < computeList.size()) {
+						buffer.append(",");
+					}
+					i++;
+				}
+				representation = OcciCheck.checkContentType(requestHeaders, buffer,
+						getResponse());
+				getResponse().setEntity(representation);
+				if (computeList.size() <= 0) {
+					// return http status code
+					getResponse().setStatus(Status.SUCCESS_NO_CONTENT,
+							buffer.toString());
+					return "There are no compute resources";
+				} else if (representation.getMediaType().toString().equals("text/occi")) {
+					// Set Location Attribute
+					setLocationRef(buffer.toString());
+					// return http status code
+					getResponse().setStatus(Status.SUCCESS_OK, " ");
+				} else {
+					// return http status code
+					getResponse().setStatus(Status.SUCCESS_OK);
+				}
 				return " ";
 			}
-			// set right representation and status code
-			getResponse().setEntity(representation);
-			getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
-			return buffer.toString();
 		} catch (ResourceException e) {
 			throw e;
 		} catch (NullPointerException e) {
@@ -676,6 +759,20 @@ public class OcciRestCompute extends ServerResource {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
 			return e.toString();
+		}
+	}
+
+	private void deleteComputeResourceById(String uuid) {
+
+		try {
+			DeleteAction deleteAction = new DeleteAction();
+			deleteAction.execute(new URI(uuid), null);
+		} catch (ResourceException re) {
+			throw re;
+		} catch (URISyntaxException e) {
+			getResponse().setStatus(Status.CLIENT_ERROR_NOT_FOUND,
+					e.getMessage());
+			throw new RuntimeException("URI Syntax error.");
 		}
 	}
 
@@ -691,35 +788,33 @@ public class OcciRestCompute extends ServerResource {
 				OcciConfig.getInstance().config.getString("occi.version"));
 		LOGGER.debug("Incoming delete request");
 		try {
-			OcciCheck.isUUID(getReference().getLastSegment());
-			// get compute resource that should be deleted
-			Compute compute = Compute.getComputeList().get(
-					UUID.fromString(getReference().getLastSegment()));
-			DeleteAction deleteAction = new DeleteAction();
-			deleteAction.execute(new URI(compute.getId().toString()), null);
-			// remove it from compute resource list
-			if (Compute.getComputeList().remove(
-					UUID.fromString(compute.getId().toString())) == null) {
-				throw new Exception("There is no resorce with the given ID");
+			if (getReference().getLastSegment().equals("compute")) {
+				Map<UUID, Compute> computeList = Compute.getComputeList();
+				Set<UUID> keySet = computeList.keySet();
+				Iterator<UUID> iterator = keySet.iterator();
+				while (iterator.hasNext()) {
+					UUID next = iterator.next();
+					deleteComputeResourceById(next.toString());
+					iterator.remove();
+				}
+			} else {
+				OcciCheck.isUUID(getReference().getLastSegment());
+				Compute compute = Compute.getComputeList().get(
+						UUID.fromString(getReference().getLastSegment()));
+				deleteComputeResourceById(compute.getId().toString());
+				// remove it from compute resource list
+				if (Compute.getComputeList().remove(
+						UUID.fromString(compute.getId().toString())) == null) {
+					getResponse().setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+					throw new RuntimeException("Compute resource : "
+							+ compute.getId().toString()
+							+ " cannot be deleted.");
+				}
 			}
 			getResponse().setStatus(Status.SUCCESS_OK);
-
-			// set compute resource to null
-			compute = null;
 			return " ";
 		} catch (ResourceException e) {
 			throw e;
-		} catch (NullPointerException e) {
-			getResponse().setStatus(Status.CLIENT_ERROR_NOT_FOUND,
-					e.getMessage());
-			return "UUID(" + UUID.fromString(getReference().getLastSegment())
-					+ ") not found! " + e.toString()
-					+ "\n Compute resource could not be deleted.";
-			// Exception for isUUID method
-		} catch (Exception e) {
-			getResponse().setStatus(Status.CLIENT_ERROR_NOT_FOUND,
-					e.getMessage());
-			return e.toString();
 		}
 	}
 
