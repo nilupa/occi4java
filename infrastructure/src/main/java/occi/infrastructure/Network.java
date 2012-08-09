@@ -291,4 +291,13 @@ public class Network extends Resource {
 	public static HashSet<String> getAttributes() {
 		return attributes;
 	}
+
+	public final Action getUp() {
+		return up;
+	}
+
+	public final Action getDown() {
+		return down;
+	}
+	
 }

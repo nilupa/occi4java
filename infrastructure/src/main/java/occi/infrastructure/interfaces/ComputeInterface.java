@@ -36,6 +36,7 @@ public interface ComputeInterface {
 	 * @return compute
 	 */
 	Compute createCompute(Compute compute);
+
 	/**
 	 * Starts a existing compute resource.
 	 * 
@@ -52,7 +53,7 @@ public interface ComputeInterface {
 	 * @return Compute
 	 */
 	Compute stopCompute(Compute compute, Method stop);
-	
+
 	/**
 	 * Suspends a existing compute resource.
 	 * 
@@ -60,7 +61,7 @@ public interface ComputeInterface {
 	 * @return Compute
 	 */
 	Compute suspendCompute(Compute compute, Method suspend);
-	
+
 	/**
 	 * Starts a started compute resource.
 	 * 
@@ -68,7 +69,7 @@ public interface ComputeInterface {
 	 * @return Compute
 	 */
 	Compute restartCompute(Compute compute, Method restart);
-	
+
 	/**
 	 * Deletes all files for a existing compute resource.
 	 * 
@@ -76,4 +77,52 @@ public interface ComputeInterface {
 	 * @return compute
 	 */
 	Compute deleteCompute(Compute compute);
+
+	/**
+	 * Makes the clone of compute resource
+	 * 
+	 * @param compute
+	 * @return
+	 */
+	Compute makeCloneCompute(Compute compute);
+
+	/**
+	 * Makes the snapshot of the compute resource
+	 * 
+	 * @param compute
+	 * @return
+	 */
+	Compute makeSnapShotCompute(Compute compute);
+
+	/**
+	 * Migrates the compute resource
+	 * 
+	 * @param compute
+	 * @return
+	 */
+	Compute makeMigrateCompute(Compute compute);
+
+	/**
+	 * Collates the compute resource
+	 * 
+	 * @param compute
+	 * @return
+	 */
+	Compute makeCollateCompute(Compute compute);
+
+	/**
+	 * De-collates the compute resource
+	 * 
+	 * @param compute
+	 * @return
+	 */
+	Compute makeDecollateCompute(Compute compute);
+
+	/**
+	 * Change the SLA
+	 * 
+	 * @param compute
+	 * @return
+	 */
+	Compute setSLACompute(Compute compute);
 }

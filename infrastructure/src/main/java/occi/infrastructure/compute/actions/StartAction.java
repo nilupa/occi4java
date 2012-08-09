@@ -56,8 +56,6 @@ public class StartAction extends Action {
 	public enum Start implements Method {
 		start
 	}
-
-	private Start start;
 	private HashSet<String> attributes = new HashSet<String>();
 
 	public StartAction() throws SchemaViolationException, URISyntaxException {
@@ -73,13 +71,8 @@ public class StartAction extends Action {
 		
 		Compute compute = null;
 		String uriString = uri.toString();
-		
-//		if (uri.toString().endsWith("/")) {
-//			uriString = uriString.substring(0, uri.toString().length() - 1);
-//			uriString = uriString.substring(uriString.length() - 36);
-//		}
+
 		uriString = uriString.substring(0, uri.toString().length());
-		System.out.println(uriString.length());
 		uriString = uriString.substring(uriString.length() - 36);
 		
 		LOGGER.debug("URI " + uriString);

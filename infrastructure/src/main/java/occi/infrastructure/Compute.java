@@ -114,6 +114,13 @@ public class Compute extends Resource {
 	private Action stop = (Action) beanFactory.getBean("stop");
 	private Action suspend = (Action) beanFactory.getBean("suspend");
 	private Action restart = (Action) beanFactory.getBean("restart");
+	private Action clone = (Action) beanFactory.getBean("clone");
+	private Action collate = (Action) beanFactory.getBean("collate");
+	private Action deCollate = (Action) beanFactory.getBean("deCollate");
+	private Action migrate = (Action) beanFactory.getBean("migrate");
+	private Action sla = (Action) beanFactory.getBean("sla");
+	private Action computeSnapshot = (Action) beanFactory.getBean("computeSnapshot");
+	
 
 	private static final HashSet<Action> actionSet = new HashSet<Action>();
 	private static final HashSet<String> actionNames = new HashSet<String>();
@@ -427,4 +434,53 @@ public class Compute extends Resource {
 	public final Action getSuspend() {
 		return suspend;
 	}
+
+	public final Action getClone() {
+		return clone;
+	}
+
+	public final void setClone(Action clone) {
+		this.clone = clone;
+	}
+
+	public final Action getCollate() {
+		return collate;
+	}
+
+	public final void setCollate(Action collate) {
+		this.collate = collate;
+	}
+
+	public final Action getDeCollate() {
+		return deCollate;
+	}
+
+	public final void setDeCollate(Action deCollate) {
+		this.deCollate = deCollate;
+	}
+
+	public final Action getMigrate() {
+		return migrate;
+	}
+
+	public final void setMigrate(Action migrate) {
+		this.migrate = migrate;
+	}
+
+	public final Action getSla() {
+		return sla;
+	}
+
+	public final void setSla(Action sla) {
+		this.sla = sla;
+	}
+
+	public final Action getComputeSnapshot() {
+		return computeSnapshot;
+	}
+
+	public final void setComputeSnapshot(Action computeSnapshot) {
+		this.computeSnapshot = computeSnapshot;
+	}
+	
 }

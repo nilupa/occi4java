@@ -74,7 +74,6 @@ public class UpAction extends Action {
 			}
 		}
 		networkInterface.upNetwork(network);
-
 	}
 
 	/**

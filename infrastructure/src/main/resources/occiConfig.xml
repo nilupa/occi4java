@@ -40,6 +40,30 @@
 	<bean id="suspend" class="occi.infrastructure.compute.actions.SuspendAction"
 		lazy-init="true" scope="prototype">
 	</bean>
+	
+	<bean id="clone" class="occi.infrastructure.compute.actions.CloneAction"
+		lazy-init="true" scope="prototype">
+	</bean>
+	
+	<bean id="collate" class="occi.infrastructure.compute.actions.CollateAction"
+		lazy-init="true" scope="prototype">
+	</bean>
+	
+	<bean id="deCollate" class="occi.infrastructure.compute.actions.DecollateAction"
+		lazy-init="true" scope="prototype">
+	</bean>
+	
+	<bean id="migrate" class="occi.infrastructure.compute.actions.MigrateAction"
+		lazy-init="true" scope="prototype">
+	</bean>
+	
+	<bean id="sla" class="occi.infrastructure.compute.actions.SLAAction"
+		lazy-init="true" scope="prototype">
+	</bean>
+	
+	<bean id="computeSnapshot" class="occi.infrastructure.compute.actions.SnapshotAction"
+		lazy-init="true" scope="prototype">
+	</bean>
 
 	<!-- Storage actions -->
 	<bean id="create" class="occi.infrastructure.storage.actions.CreateAction"
