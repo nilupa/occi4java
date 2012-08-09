@@ -40,9 +40,14 @@ import occi.infrastructure.Compute.Architecture;
 import occi.infrastructure.Compute.State;
 import occi.infrastructure.Network;
 import occi.infrastructure.Storage;
+import occi.infrastructure.compute.actions.CloneAction.Clone;
+import occi.infrastructure.compute.actions.CollateAction.Collate;
 import occi.infrastructure.compute.actions.CreateAction;
+import occi.infrastructure.compute.actions.DecollateAction.DeCollate;
 import occi.infrastructure.compute.actions.DeleteAction;
+import occi.infrastructure.compute.actions.MigrateAction.Migrate;
 import occi.infrastructure.compute.actions.RestartAction.Restart;
+import occi.infrastructure.compute.actions.SLAAction.Sla;
 import occi.infrastructure.compute.actions.StartAction.Start;
 import occi.infrastructure.compute.actions.StopAction.Stop;
 import occi.infrastructure.compute.actions.SuspendAction.Suspend;
@@ -64,6 +69,8 @@ import org.restlet.resource.ResourceException;
 import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.sun.xml.internal.bind.v2.runtime.unmarshaller.LocatorEx.Snapshot;
 
 public class OcciRestCompute extends ServerResource {
 
@@ -527,7 +534,7 @@ public class OcciRestCompute extends ServerResource {
 						// ////////////////////////////////////////////////////////////////////////////
 					}
 
-					if (actionName[1].equalsIgnoreCase("stop")) {
+					else if (actionName[1].equalsIgnoreCase("stop")) {
 						LOGGER.debug("Stop Action called.");
 						// Call the Stop action of the compute resource
 						compute.getStop().execute(URI.create(location),
@@ -536,7 +543,7 @@ public class OcciRestCompute extends ServerResource {
 						compute.setState(State.inactive);
 					}
 
-					if (actionName[1].equalsIgnoreCase("restart")) {
+					else if (actionName[1].equalsIgnoreCase("restart")) {
 						LOGGER.debug("Restart Action called.");
 						// Call the Restart action of the compute resource
 						compute.getRestart()
@@ -548,7 +555,7 @@ public class OcciRestCompute extends ServerResource {
 						compute.setState(State.active);
 					}
 
-					if (actionName[1].equalsIgnoreCase("suspend")) {
+					else if (actionName[1].equalsIgnoreCase("suspend")) {
 						LOGGER.debug("Suspend Action called.");
 						// Call the Suspend action of the compute resource
 						compute.getSuspend()
@@ -558,19 +565,80 @@ public class OcciRestCompute extends ServerResource {
 												.get("method")));
 						// Set the current state of the compute resource
 						compute.setState(State.suspended);
+					} else if (actionName[1].equalsIgnoreCase("clone")) {
+						LOGGER.debug("Clone Action called.");
+						// Call the Clone action of the compute resource
+						compute.getClone().execute(URI.create(location),
+								Clone.valueOf((String) xoccimap.get("method")));
+						// Set the current state of the compute resource
+						compute.setState(State.active);
+					} else if (actionName[1].equalsIgnoreCase("collate")) {
+						LOGGER.debug("Collate Action called.");
+						// Call the Collate action of the compute resource
+						compute.getCollate()
+								.execute(
+										URI.create(location),
+										Collate.valueOf((String) xoccimap
+												.get("method")));
+						// Set the current state of the compute resource
+						compute.setState(State.active);
+					} else if (actionName[1].equalsIgnoreCase("decollate")) {
+						LOGGER.debug("De collate Action called.");
+						// Call the Collate action of the compute resource
+						compute.getDeCollate().execute(
+								URI.create(location),
+								DeCollate.valueOf((String) xoccimap
+										.get("method")));
+						// Set the current state of the compute resource
+						compute.setState(State.active);
+					} else if (actionName[1].equalsIgnoreCase("snapshot")) {
+						LOGGER.debug("Snapshot Action called.");
+						// Call the snapshot action of the compute resource
+						compute.getComputeSnapshot()
+								.execute(
+										URI.create(location),
+										occi.infrastructure.compute.actions.SnapshotAction.Snapshot
+												.valueOf((String) xoccimap
+														.get("method")));
+						// Set the current state of the compute resource
+						compute.setState(State.active);
+					} else if (actionName[1].equalsIgnoreCase("migrate")) {
+						LOGGER.debug("Migrate Action called.");
+						// Call the migrate action of the compute resource
+						compute.getMigrate()
+								.execute(
+										URI.create(location),
+										Migrate.valueOf((String) xoccimap
+												.get("method")));
+						// Set the current state of the compute resource
+						compute.setState(State.active);
+					} else if (actionName[1].equalsIgnoreCase("sla")) {
+						LOGGER.debug("Sla Action called.");
+						// Call the Collate action of the compute resource
+						compute.getSla().execute(URI.create(location),
+								Sla.valueOf((String) xoccimap.get("method")));
+						// Set the current state of the compute resource
+						compute.setState(State.active);
+					} else {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						return "Invalid action type"+Response.getCurrent().toString();
 					}
+				} else {
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					return Response.getCurrent().toString();
+
 				}
+				getResponse().setStatus(Status.SUCCESS_OK);
+				return Response.getCurrent().toString();
 			}
 
-		} catch (ResourceException e) {
-			throw e;
 		} catch (Exception e) {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
 			e.printStackTrace();
 			return "Exception caught: " + e.toString() + "\n";
 		}
-		return " ";
 	}
 
 	@Get
@@ -672,7 +740,7 @@ public class OcciRestCompute extends ServerResource {
 						}
 
 					}
-					buffer.append(linkBuffer);					
+					buffer.append(linkBuffer);
 					LOGGER.debug("Links: " + linkBuffer.toString());
 				}
 				for (Mixin mixin : Mixin.getMixins()) {
@@ -682,23 +750,23 @@ public class OcciRestCompute extends ServerResource {
 							mixinBuffer.append("Category: " + mixin.getTitle()
 									+ "; scheme=\"" + mixin.getScheme()
 									+ "\"; class=\"mixin\"");
-							if(mixin instanceof OSTemplate)
-							{
-								OSTemplate osTemplate = (OSTemplate)mixin;
-								mixinBuffer.append("occi.os_tpl.term: "+osTemplate.getOsTerm());
-							}
-							else if(mixin instanceof SlaTemplate){
-								SlaTemplate slaTemplate = (SlaTemplate)mixin;
-								mixinBuffer.append("occi.resource_tpl.sla: "+slaTemplate.getSlaName());
+							if (mixin instanceof OSTemplate) {
+								OSTemplate osTemplate = (OSTemplate) mixin;
+								mixinBuffer.append("occi.os_tpl.term: "
+										+ osTemplate.getOsTerm());
+							} else if (mixin instanceof SlaTemplate) {
+								SlaTemplate slaTemplate = (SlaTemplate) mixin;
+								mixinBuffer.append("occi.resource_tpl.sla: "
+										+ slaTemplate.getSlaName());
 							}
 						}
 					}
 				}
 				buffer.append(mixinBuffer);
-				LOGGER.debug("Mixin: "+ mixinBuffer);
+				LOGGER.debug("Mixin: " + mixinBuffer);
 				// access the request headers and get the Accept attribute
-				representation = OcciCheck.checkContentType(
-						requestHeaders, buffer, getResponse());
+				representation = OcciCheck.checkContentType(requestHeaders,
+						buffer, getResponse());
 				// Check the accept header
 				if (requestHeaders.getFirstValue(acceptCase)
 						.equals("text/occi")) {
@@ -729,15 +797,16 @@ public class OcciRestCompute extends ServerResource {
 					}
 					i++;
 				}
-				representation = OcciCheck.checkContentType(requestHeaders, buffer,
-						getResponse());
+				representation = OcciCheck.checkContentType(requestHeaders,
+						buffer, getResponse());
 				getResponse().setEntity(representation);
 				if (computeList.size() <= 0) {
 					// return http status code
 					getResponse().setStatus(Status.SUCCESS_NO_CONTENT,
 							buffer.toString());
 					return "There are no compute resources";
-				} else if (representation.getMediaType().toString().equals("text/occi")) {
+				} else if (representation.getMediaType().toString()
+						.equals("text/occi")) {
 					// Set Location Attribute
 					setLocationRef(buffer.toString());
 					// return http status code
@@ -748,8 +817,6 @@ public class OcciRestCompute extends ServerResource {
 				}
 				return " ";
 			}
-		} catch (ResourceException e) {
-			throw e;
 		} catch (NullPointerException e) {
 			e.printStackTrace();
 			getResponse().setStatus(Status.CLIENT_ERROR_NOT_FOUND);
@@ -814,7 +881,9 @@ public class OcciRestCompute extends ServerResource {
 			getResponse().setStatus(Status.SUCCESS_OK);
 			return " ";
 		} catch (ResourceException e) {
-			throw e;
+			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
+					e.toString());
+			return "Exception caught :" + e.toString();
 		}
 	}
 
@@ -865,7 +934,11 @@ public class OcciRestCompute extends ServerResource {
 					}
 				}
 				LOGGER.debug("X-OCCI-Map empty?: " + xoccimap.isEmpty());
-				if (!xoccimap.isEmpty()) {
+
+				if (xoccimap.isEmpty()) {
+					getResponse().setStatus(Status.SUCCESS_OK);
+					return "Nothing changed";
+				} else {
 					// Change the compute attribute if it is send by the request
 					if (xoccimap.containsKey("occi.compute.architecture")) {
 						LOGGER.info((String) xoccimap
@@ -907,17 +980,10 @@ public class OcciRestCompute extends ServerResource {
 
 					// set response status
 					getResponse().setStatus(Status.SUCCESS_OK);
-
 					return Response.getCurrent().toString();
-				} else {
-					getResponse().setStatus(Status.SUCCESS_OK);
-					return "Nothing changed";
 				}
 			}
 			// Catch possible exceptions
-		} catch (ResourceException e) {
-			throw e;
-
 		} catch (Exception e) {
 
 			LOGGER.error("Exception caught: " + e.toString());
@@ -925,6 +991,6 @@ public class OcciRestCompute extends ServerResource {
 					e.toString());
 			return "Exception: " + e.getMessage() + "\n";
 		}
-		return " ";
+		return null;
 	}
 }

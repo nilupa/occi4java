@@ -18,6 +18,7 @@
 
 package occi.http;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -31,6 +32,8 @@ import occi.http.check.OcciCheck;
 import occi.infrastructure.Network;
 import occi.infrastructure.Network.State;
 import occi.infrastructure.links.NetworkInterface;
+import occi.infrastructure.network.actions.DownAction.Down;
+import occi.infrastructure.network.actions.UpAction.Up;
 
 import org.restlet.Response;
 import org.restlet.data.Form;
@@ -62,9 +65,10 @@ public class OcciRestNetwork extends ServerResource {
 		 */
 		for (Kind kind : Kind.getKinds()) {
 			if (kind != null && kind.getTerm().equals("network")) {
-				NetworkInterface networkinterface = NetworkInterface.getNetworkInterfaceList()
-						.get(UUID.fromString(getReference().getLastSegment()
-								.toString()));
+				NetworkInterface networkinterface = NetworkInterface
+						.getNetworkInterfaceList().get(
+								UUID.fromString(getReference().getLastSegment()
+										.toString()));
 				buffer.append("Category: " + kind.getTerm() + ";");
 				buffer.append("\t\t scheme=\"" + kind.getScheme() + "\";");
 				buffer.append("\r\n");
@@ -128,11 +132,11 @@ public class OcciRestNetwork extends ServerResource {
 		LOGGER.debug("Incoming delete request at network");
 		try {
 			// get network resource that should be deleted
-			Network network = Network.getNetworkList().get(UUID
-					.fromString(getReference().getLastSegment()));
+			Network network = Network.getNetworkList().get(
+					UUID.fromString(getReference().getLastSegment()));
 			// remove it from network resource list
-			if (Network.getNetworkList().remove(UUID.fromString(network.getId()
-					.toString())) == null) {
+			if (Network.getNetworkList().remove(
+					UUID.fromString(network.getId().toString())) == null) {
 				throw new NullPointerException(
 						"There is no resorce with the given ID");
 			}
@@ -194,71 +198,133 @@ public class OcciRestNetwork extends ServerResource {
 				}
 			}
 
-			// put occi attributes into a buffer for the response
-			StringBuffer buffer = new StringBuffer();
-			buffer.append("occi.network.vlan=").append(
-					xoccimap.get("occi.network.vlan"));
-			buffer.append(" occi.network.label=").append(
-					xoccimap.get("occi.network.label"));
-			buffer.append(" occi.network.state=").append(
-					xoccimap.get("occi.network.state"));
+			// Check if last part of the URI is not action
+			if (!getReference().toString().contains("action")) {
+				// put occi attributes into a buffer for the response
+				StringBuffer buffer = new StringBuffer();
+				buffer.append("occi.network.vlan=").append(
+						xoccimap.get("occi.network.vlan"));
+				buffer.append(" occi.network.label=").append(
+						xoccimap.get("occi.network.label"));
+				buffer.append(" occi.network.state=").append(
+						xoccimap.get("occi.network.state"));
 
-			Set<String> set = new HashSet<String>();
-			set.add("summary: ");
-			set.add(buffer.toString());
-			set.add(requestHeaders.getFirstValue("scheme"));
+				Set<String> set = new HashSet<String>();
+				set.add("summary: ");
+				set.add(buffer.toString());
+				set.add(requestHeaders.getFirstValue("scheme"));
 
-			// create new Compute instance with the given attributes
-			Network network = new Network(State.inactive, (String) xoccimap
-					.get("occi.network.label"), Integer
-					.parseInt((String) xoccimap.get("occi.network.vlan")),
-					null, null);
-			network.setKind(new Kind(null, "network", "network", null));
-			
-			StringBuffer resource = new StringBuffer();
-			String path = getRootRef().getPath();
-			if (path != null) {
-				resource.append(path);
-			}
-			
-			resource.append("/").append(network.getKind().getTerm())
-					.append("/");
-			getRootRef().setPath(resource.toString());
+				// create new Compute instance with the given attributes
+				Network network = new Network(State.inactive,
+						(String) xoccimap.get("occi.network.label"),
+						Integer.parseInt((String) xoccimap
+								.get("occi.network.vlan")), null, null);
+				network.setKind(new Kind(null, "network", "network", null));
 
-			// check of the category
-			if (!"network".equalsIgnoreCase(xoccimap.get(
-					"occi.network.Category").toString())) {
-				throw new IllegalArgumentException("Illegal Category type: "
-						+ xoccimap.get("occi.network.Category"));
-			}
-			for (Mixin mixin : Mixin.getMixins()) {
-				if (mixin.getEntities() != null) {
-					if (mixin.getEntities().contains(network)) {
-						buffer.append("Category: " + mixin.getTitle()
-								+ "; scheme=\"" + mixin.getScheme()
-								+ "\"; class=\"mixin\"");
+				StringBuffer resource = new StringBuffer();
+				String path = getRootRef().getPath();
+				if (path != null) {
+					resource.append(path);
+				}
+
+				resource.append("/").append(network.getKind().getTerm())
+						.append("/");
+				getRootRef().setPath(resource.toString());
+
+				// check of the category
+				if (!"network".equalsIgnoreCase(xoccimap.get(
+						"occi.network.Category").toString())) {
+					throw new IllegalArgumentException(
+							"Illegal Category type: "
+									+ xoccimap.get("occi.network.Category"));
+				}
+				for (Mixin mixin : Mixin.getMixins()) {
+					if (mixin.getEntities() != null) {
+						if (mixin.getEntities().contains(network)) {
+							buffer.append("Category: " + mixin.getTitle()
+									+ "; scheme=\"" + mixin.getScheme()
+									+ "\"; class=\"mixin\"");
+						}
 					}
 				}
-			}
-			// Check accept header
-			if (requestHeaders.getFirstValue("accept", true)
-					.equals("text/occi")
-					|| requestHeaders.getFirstValue("content-type", true)
-							.equals("text/occi")) {
-				// Generate header rendering
-				occiCheck.setHeaderRendering(null, network, buffer.toString(),
-						null);
+				// Check accept header
+				if (requestHeaders.getFirstValue("accept", true).equals(
+						"text/occi")
+						|| requestHeaders.getFirstValue("content-type", true)
+								.equals("text/occi")) {
+					// Generate header rendering
+					occiCheck.setHeaderRendering(null, network,
+							buffer.toString(), null);
+					getResponse().setEntity(representation);
+					getResponse().setStatus(Status.SUCCESS_OK);
+				}
+				// Location Rendering in HTTP Header, not in body
+				setLocationRef((getRootRef().toString() + network.getId()));
+				representation = OcciCheck.checkContentType(requestHeaders,
+						buffer, getResponse());
 				getResponse().setEntity(representation);
+				// set response status
+				getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
+				return Response.getCurrent().toString();
+			} else {
+				String[] splitURI = getReference().toString().split("\\/");
+				LOGGER.debug("splitURI length: " + splitURI.length);
+				UUID id = null;
+				for (String element : splitURI) {
+					if (element.contains("?")) {
+						element = element.substring(0, element.indexOf("?"));
+					}
+					if (OcciCheck.isUUID(element)) {
+						id = UUID.fromString(element);
+					}
+				}
+				LOGGER.debug("UUID: " + id);
+				// Get the network resource by the given UUID
+				Network network = Network.getNetworkList().get(id);
+
+				String location = "http:"
+						+ getReference().getHierarchicalPart();
+
+				// Extract the action type / name from the last part of the
+				// given
+				// location URI and split it after the "=" (../?action=up)
+				String[] actionName = getReference()
+						.getRemainingPart()
+						.subSequence(1,
+								getReference().getRemainingPart().length())
+						.toString().split("\\=");
+				LOGGER.debug("Action Name: " + actionName[1]);
+
+				// Check if actionName[1] is set
+				if (actionName.length >= 2) {
+					if (actionName[1].equalsIgnoreCase("up")) {
+						LOGGER.debug("Up Action called.");
+						// Call the up action of the network resource
+						network.getUp().execute(URI.create(location),
+								Up.valueOf((String) xoccimap.get("method")));
+						// Set the current state of the network resource
+						network.setState(State.active);
+					} else if (actionName[1].equalsIgnoreCase("down")) {
+						LOGGER.debug("Down Action called.");
+						// Call the down action of the network resource
+						network.getDown().execute(URI.create(location),
+								Down.valueOf((String) xoccimap.get("method")));
+						// Set the current state of the network resource
+						network.setState(State.inactive);
+					}
+					else{
+						getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						return "Invalid action type"+Response.getCurrent().toString();
+					}
+				}
+				else
+				{
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					return Response.getCurrent().toString();
+				}
 				getResponse().setStatus(Status.SUCCESS_OK);
+				return Response.getCurrent().toString();
 			}
-			// Location Rendering in HTTP Header, not in body
-			setLocationRef((getRootRef().toString() + network.getId()));
-			representation = OcciCheck.checkContentType(requestHeaders, buffer,
-					getResponse());
-			getResponse().setEntity(representation);
-			// set response status
-			getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
-			return Response.getCurrent().toString();
 		} catch (Exception e) {
 			e.printStackTrace();
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
@@ -281,8 +347,8 @@ public class OcciRestNetwork extends ServerResource {
 			getServerInfo().setAgent(
 					OcciConfig.getInstance().config.getString("occi.version"));
 			OcciCheck.isUUID(getReference().getLastSegment());
-			Network network = Network.getNetworkList().get(UUID
-					.fromString(getReference().getLastSegment()));
+			Network network = Network.getNetworkList().get(
+					UUID.fromString(getReference().getLastSegment()));
 			// access the request headers and get the X-OCCI-Attribute
 			Form requestHeaders = (Form) getRequest().getAttributes().get(
 					"org.restlet.http.headers");

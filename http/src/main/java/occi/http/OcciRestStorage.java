@@ -18,6 +18,7 @@
 
 package occi.http;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -30,6 +31,10 @@ import occi.core.Mixin;
 import occi.http.check.OcciCheck;
 import occi.infrastructure.Storage;
 import occi.infrastructure.Storage.State;
+import occi.infrastructure.storage.actions.BackupAction.Backup;
+import occi.infrastructure.storage.actions.OfflineAction.Offline;
+import occi.infrastructure.storage.actions.OnlineAction.Online;
+import occi.infrastructure.storage.actions.ResizeAction.Resize;
 
 import org.restlet.Response;
 import org.restlet.data.Form;
@@ -105,7 +110,7 @@ public class OcciRestStorage extends ServerResource {
 				return buffer.toString();
 			}
 		}
-		
+
 		getResponse().setStatus(Status.SUCCESS_NO_CONTENT);
 		return " ";
 	}
@@ -188,67 +193,175 @@ public class OcciRestStorage extends ServerResource {
 					xoccimap.put(temp[0], temp[1]);
 				}
 			}
+			// Check if last part of the URI is not action
+			if (!getReference().toString().contains("action")) {
+				// put occi attributes into a buffer for the response
+				StringBuffer buffer = new StringBuffer();
+				buffer.append("occi.storage.state=").append(
+						xoccimap.get("occi.storage.state"));
+				buffer.append(" occi.storage.size=").append(
+						xoccimap.get("occi.storage.size"));
 
-			// put occi attributes into a buffer for the response
-			StringBuffer buffer = new StringBuffer();
-			buffer.append("occi.storage.state=").append(
-					xoccimap.get("occi.storage.state"));
-			buffer.append(" occi.storage.size=").append(
-					xoccimap.get("occi.storage.size"));
+				Set<String> set = new HashSet<String>();
+				set.add("summary: ");
+				set.add(buffer.toString());
+				set.add(requestHeaders.getFirstValue("scheme"));
 
-			Set<String> set = new HashSet<String>();
-			set.add("summary: ");
-			set.add(buffer.toString());
-			set.add(requestHeaders.getFirstValue("scheme"));
+				// create new Compute instance with the given attributes
+				Storage storage = new Storage(
+						Float.parseFloat((String) xoccimap
+								.get("occi.storage.size")), State.offline,
+						null, null);
+				storage.setKind(new Kind(null, "storage", "storage", null));
+				StringBuffer resource = new StringBuffer();
+				String path = getRootRef().getPath();
+				if (path != null) {
+					resource.append(path);
+				}
+				resource.append("/").append(storage.getKind().getTerm())
+						.append("/");
+				getRootRef().setPath(resource.toString());
 
-			// create new Compute instance with the given attributes
-			Storage storage = new Storage(Float.parseFloat((String) xoccimap
-					.get("occi.storage.size")), State.offline, null, null);
-			storage.setKind(new Kind(null, "storage", "storage", null));
-			StringBuffer resource = new StringBuffer();
-			String path = getRootRef().getPath();
-			if (path != null) {
-				resource.append(path);
-			}
-			resource.append("/").append(storage.getKind().getTerm())
-					.append("/");
-			getRootRef().setPath(resource.toString());
-
-			// check of the category
-			if (!"storage".equalsIgnoreCase(xoccimap.get(
-					"occi.storage.Category").toString())) {
-				throw new IllegalArgumentException("Illegal Category type: "
-						+ xoccimap.get("occi.storage.Category"));
-			}
-			for (Mixin mixin : Mixin.getMixins()) {
-				if (mixin.getEntities() != null) {
-					if (mixin.getEntities().contains(storage)) {
-						buffer.append("Category: " + mixin.getTitle()
-								+ "; scheme=\"" + mixin.getScheme()
-								+ "\"; class=\"mixin\"");
+				// check of the category
+				if (!"storage".equalsIgnoreCase(xoccimap.get(
+						"occi.storage.Category").toString())) {
+					throw new IllegalArgumentException(
+							"Illegal Category type: "
+									+ xoccimap.get("occi.storage.Category"));
+				}
+				for (Mixin mixin : Mixin.getMixins()) {
+					if (mixin.getEntities() != null) {
+						if (mixin.getEntities().contains(storage)) {
+							buffer.append("Category: " + mixin.getTitle()
+									+ "; scheme=\"" + mixin.getScheme()
+									+ "\"; class=\"mixin\"");
+						}
 					}
 				}
-			}
-			// Check accept header
-			if (requestHeaders.getFirstValue("accept", true)
-					.equals("text/occi")
-					|| requestHeaders.getFirstValue("content-type", true)
-							.equals("text/occi")) {
-				// Generate header rendering
-				occiCheck.setHeaderRendering(null, storage, buffer.toString(),
-						null);
+				// Check accept header
+				if (requestHeaders.getFirstValue("accept", true).equals(
+						"text/occi")
+						|| requestHeaders.getFirstValue("content-type", true)
+								.equals("text/occi")) {
+					// Generate header rendering
+					occiCheck.setHeaderRendering(null, storage,
+							buffer.toString(), null);
+					getResponse().setEntity(representation);
+					getResponse().setStatus(Status.SUCCESS_OK);
+				}
+				storage.getCreate().execute(storage.getId(), null);
+				// Location Rendering in HTTP Header, not in body
+				setLocationRef((getRootRef().toString() + storage.getId()));
+				representation = OcciCheck.checkContentType(requestHeaders,
+						buffer, getResponse());
 				getResponse().setEntity(representation);
+				// set response status
+				getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
+				return Response.getCurrent().toString();
+			} else {
+				String[] splitURI = getReference().toString().split("\\/");
+				LOGGER.debug("splitURI length: " + splitURI.length);
+				UUID id = null;
+				for (String element : splitURI) {
+					if (element.contains("?")) {
+						element = element.substring(0, element.indexOf("?"));
+					}
+					if (OcciCheck.isUUID(element)) {
+						id = UUID.fromString(element);
+					}
+				}
+				LOGGER.debug("UUID: " + id);
+				// Get the storage resource by the given UUID
+				Storage storage = Storage.getStorageList().get(id);
+
+				String location = "http:"
+						+ getReference().getHierarchicalPart();
+
+				// Extract the action type / name from the last part of the
+				// given
+				// location URI and split it after the "=" (../?action=backup)
+				String[] actionName = getReference()
+						.getRemainingPart()
+						.subSequence(1,
+								getReference().getRemainingPart().length())
+						.toString().split("\\=");
+				LOGGER.debug("Action Name: " + actionName[1]);
+				// Check if actionName[1] is set
+				if (actionName.length >= 2) {
+					if (actionName[1].equalsIgnoreCase("online")) {
+						LOGGER.debug("Online Action called.");
+						// Call the online action of the storage resource
+						storage.getOnline()
+								.execute(
+										URI.create(location),
+										Online.valueOf((String) xoccimap
+												.get("method")));
+						// Set the current state of the storage resource
+						storage.setState(State.online);
+					} else if (actionName[1].equalsIgnoreCase("offline")) {
+						LOGGER.debug("Offline Action called.");
+						// Call the offline action of the storage resource
+						storage.getOffline()
+								.execute(
+										URI.create(location),
+										Offline.valueOf((String) xoccimap
+												.get("method")));
+						// Set the current state of the storage resource
+						storage.setState(State.offline);
+					} else if (actionName[1].equalsIgnoreCase("offline")) {
+						LOGGER.debug("Offline Action called.");
+						// Call the offline action of the storage resource
+						storage.getOffline()
+								.execute(
+										URI.create(location),
+										Offline.valueOf((String) xoccimap
+												.get("method")));
+						// Set the current state of the storage resource
+						storage.setState(State.offline);
+					} else if (actionName[1].equalsIgnoreCase("backup")) {
+						LOGGER.debug("Backup Action called.");
+						// Call the backup action of the storage resource
+						storage.getBackup()
+								.execute(
+										URI.create(location),
+										Backup.valueOf((String) xoccimap
+												.get("method")));
+						// Set the current state of the storage resource
+						storage.setState(State.online);
+					} else if (actionName[1].equalsIgnoreCase("resize")) {
+						LOGGER.debug("Resize Action called.");
+						// Call the resize action of the storage resource
+						storage.getResize()
+								.execute(
+										URI.create(location),
+										Resize.valueOf((String) xoccimap
+												.get("method")));
+						// Set the current state of the storage resource
+						storage.setState(State.online);
+					} else if (actionName[1].equalsIgnoreCase("snapshot")) {
+						LOGGER.debug("Snapshot Action called.");
+						// Call the snapshot action of the storage resource
+						storage.getSnapshot()
+								.execute(
+										URI.create(location),
+										occi.infrastructure.storage.actions.SnapshotAction.Snapshot
+												.valueOf((String) xoccimap
+														.get("method")));
+						// Set the current state of the storage resource
+						storage.setState(State.online);
+					} else {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						return "Invalid action type"
+								+ Response.getCurrent().toString();
+					}
+				} else {
+					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+					return Response.getCurrent().toString();
+				}
 				getResponse().setStatus(Status.SUCCESS_OK);
+				return Response.getCurrent().toString();
 			}
-			storage.getCreate().execute(storage.getId(), null);
-			// Location Rendering in HTTP Header, not in body
-			setLocationRef((getRootRef().toString() + storage.getId()));
-			representation = OcciCheck.checkContentType(requestHeaders, buffer,
-					getResponse());
-			getResponse().setEntity(representation);
-			// set response status
-			getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
-			return Response.getCurrent().toString();
 		} catch (Exception e) {
 			e.printStackTrace();
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
