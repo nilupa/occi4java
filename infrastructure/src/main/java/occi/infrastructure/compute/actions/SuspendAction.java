@@ -75,10 +75,10 @@ public class SuspendAction extends Action {
 		LOGGER.debug("libvirt: Suspend");
 		Compute compute = null;
 		String uriString = uri.toString();
-		if (uri.toString().endsWith("/")) {
-			uriString = uriString.substring(0, uri.toString().length() - 1);
-			uriString = uriString.substring(uriString.length() - 36);
-		}
+
+		uriString = uriString.substring(0, uri.toString().length());
+		uriString = uriString.substring(uriString.length() - 36);
+		
 		LOGGER.debug("URI " + uriString);
 		UUID computeUuid = UUID.fromString(uriString);
 		LOGGER.debug("UUID " + computeUuid.toString());

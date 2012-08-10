@@ -27,6 +27,7 @@ import javax.naming.directory.SchemaViolationException;
 import occi.core.Action;
 import occi.core.Category;
 import occi.core.Method;
+import occi.infrastructure.Compute;
 import occi.infrastructure.Network;
 import occi.infrastructure.injection.Injection;
 import occi.infrastructure.interfaces.NetworkInterface;
@@ -61,14 +62,13 @@ public class DownAction extends Action {
 	public void execute(URI uri, Method method) {
 		Network network = null;
 		String uriString = uri.toString();
-		if (uri.toString().endsWith("/")) {
-			uriString = uriString.substring(0, uri.toString().length() - 1);
-			uriString = uriString.substring(uriString.length() - 36);
-		}
+		uriString = uriString.substring(0, uri.toString().length());
+		uriString = uriString.substring(uriString.length() - 36);
+
 		LOGGER.debug("URI " + uriString);
 		UUID networkUuid = UUID.fromString(uriString);
 		LOGGER.debug("UUID " + networkUuid.toString());
-		for (UUID uuid : Network.getNetworkList().keySet()) {
+		for (UUID uuid : Compute.getComputeList().keySet()) {
 			if (uuid.equals(networkUuid)) {
 				network = Network.getNetworkList().get(networkUuid);
 			}

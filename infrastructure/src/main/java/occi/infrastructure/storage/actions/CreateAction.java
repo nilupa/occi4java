@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import occi.core.Action;
 import occi.core.Method;
+import occi.infrastructure.Compute;
 import occi.infrastructure.Storage;
 import occi.infrastructure.injection.Injection;
 import occi.infrastructure.interfaces.StorageInterface;
@@ -41,14 +42,13 @@ public class CreateAction extends Action {
 		LOGGER.debug("libvirt: Create Storage");
 		Storage storage = null;
 		String uriString = uri.toString();
-		if (uri.toString().endsWith("/")) {
-			uriString = uriString.substring(0, uri.toString().length() - 1);
-			uriString = uriString.substring(uriString.length() - 36);
-		}
+		uriString = uriString.substring(0, uri.toString().length());
+		uriString = uriString.substring(uriString.length() - 36);
+
 		LOGGER.debug("URI " + uriString);
 		UUID storageUuid = UUID.fromString(uriString);
 		LOGGER.debug("UUID " + storageUuid.toString());
-		for (UUID uuid : Storage.getStorageList().keySet()) {
+		for (UUID uuid : Compute.getComputeList().keySet()) {
 			if (uuid.equals(storageUuid)) {
 				storage = Storage.getStorageList().get(storageUuid);
 			}

@@ -90,7 +90,7 @@ public class OSTemplate extends Mixin {
 		if (attributes.isEmpty()) {
 			// add all attributes to attribute list
 			attributes.add("procci.os_tpl.metadata.map");
-			attributes.add("occi.os_tpl.term");
+			attributes.add("occi.os_tpl.image");
 		}
 	}
 
