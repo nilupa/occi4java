@@ -70,8 +70,6 @@ import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.sun.xml.internal.bind.v2.runtime.unmarshaller.LocatorEx.Snapshot;
-
 public class OcciRestCompute extends ServerResource {
 
 	private static final Logger LOGGER = LoggerFactory
@@ -254,17 +252,16 @@ public class OcciRestCompute extends ServerResource {
 						compute.getMixins().add(kindOSTemplate);
 						OSTemplate osTemplate = new OSTemplate(null, category,
 								title, scheme, null);
-						if (xoccimap.get("occi.os_tpl.term") == null) {
+						if (xoccimap.get("occi.os_tpl.image") == null) {
 							getResponse().setStatus(
 									Status.CLIENT_ERROR_BAD_REQUEST);
 							throw new RuntimeException(
-									"'occi.os_tpl.value' not found");
-
+									"'occi.os_tpl.image' not found");
 						}
-						osTemplate.setOsTerm(xoccimap.get("occi.os_tpl.term")
+						osTemplate.setOsTerm(xoccimap.get("occi.os_tpl.image")
 								.toString());
-						buffer.append(" occi.os_tpl.term=").append(
-								xoccimap.get("occi.os_tpl.term").toString());
+						buffer.append(" occi.os_tpl.image=").append(
+								xoccimap.get("occi.os_tpl.image").toString());
 						osTemplate.getEntities().add(compute);
 					} catch (SchemaViolationException e) {
 						getResponse()
@@ -279,7 +276,7 @@ public class OcciRestCompute extends ServerResource {
 				} else if (className.equals("mixin")
 						&& category.equals("sla")
 						&& scheme
-								.equals("http://proactive/occi/procci.resource_tpl.sla/infrastucture#")) {
+								.equals("http://proactive/occi/procci.resource_tpl.sla/infrastructure#")) {
 
 					try {
 						Kind slaTemplate = new Kind(null, null, null, null,
@@ -292,7 +289,6 @@ public class OcciRestCompute extends ServerResource {
 									Status.CLIENT_ERROR_BAD_REQUEST);
 							throw new RuntimeException(
 									"'occi.resource_tpl.sla' value not found");
-
 						}
 						template.setSlaName(xoccimap.get(
 								"occi.resource_tpl.sla").toString());
