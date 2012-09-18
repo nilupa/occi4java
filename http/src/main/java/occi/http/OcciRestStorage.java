@@ -377,7 +377,7 @@ public class OcciRestStorage extends ServerResource {
 				// Check accept header
 				if (requestHeaders.getFirstValue("accept", true).equals(
 						"text/occi")
-						|| requestHeaders.getFirstValue("content-type", true)
+						|| requestHeaders.getFirstValue("Content-Type", true)
 								.equals("text/occi")) {
 					// Generate header rendering
 					occiCheck.setHeaderRendering(null, storage,

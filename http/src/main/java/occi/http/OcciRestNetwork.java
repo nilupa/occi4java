@@ -238,7 +238,6 @@ public class OcciRestNetwork extends ServerResource {
 				}
 			}
 			getResponse().setStatus(Status.SUCCESS_OK);
-			getResponse().setStatus(Status.SUCCESS_NO_CONTENT);
 			return buffer.toString();
 		}
 
@@ -387,7 +386,7 @@ public class OcciRestNetwork extends ServerResource {
 				// Check accept header
 				if (requestHeaders.getFirstValue("accept", true).equals(
 						"text/occi")
-						|| requestHeaders.getFirstValue("content-type", true)
+						|| requestHeaders.getFirstValue("Content-Type", true)
 								.equals("text/occi")) {
 					// Generate header rendering
 					occiCheck.setHeaderRendering(null, network,

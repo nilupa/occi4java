@@ -356,6 +356,21 @@ public class OcciRestCompute extends ServerResource {
 			// access the request headers and get the X-OCCI-Attribute
 			Form requestHeaders = (Form) getRequest().getAttributes().get(
 					"org.restlet.http.headers");
+			String contentCase = OcciCheck.checkCaseSensitivity(
+					requestHeaders.toString()).get("content-type");
+			LOGGER.debug("Media-Type: "
+					+ requestHeaders.getFirstValue(contentCase));
+			LOGGER.debug("getref getlastseg: "
+					+ getReference().getLastSegment());
+			System.out.println(contentCase);
+			// check content types
+			if (!requestHeaders.getFirstValue(contentCase).equals("text/occi")
+					&& !requestHeaders.getFirstValue(contentCase).equals(
+							"text/plain")) {
+				getResponse().setStatus(Status.CLIENT_ERROR_NOT_ACCEPTABLE,
+						"Unsupported content type.");
+				return Response.getCurrent().toString();
+			}
 			LOGGER.debug("Current request: " + requestHeaders);
 			String attributeCase = OcciCheck.checkCaseSensitivity(
 					requestHeaders.toString()).get("x-occi-attribute");
@@ -364,6 +379,7 @@ public class OcciRestCompute extends ServerResource {
 				xocciattributes = requestHeaders.getValues(attributeCase)
 						.replace(",", " ");
 			}
+			
 			String acceptCase = OcciCheck.checkCaseSensitivity(
 					requestHeaders.toString()).get("accept");
 			LOGGER.debug("Media-Type: "
@@ -475,24 +491,50 @@ public class OcciRestCompute extends ServerResource {
 				// }
 				// }
 				LOGGER.debug("Compute Uuid: " + compute.getUuid());
-				LOGGER.debug("Compute Kind scheme: "
-						+ compute.getKind().getScheme());
 				// Check accept header
-				if (requestHeaders.getFirstValue(acceptCase)
-						.equals("text/occi")) {
+				if (requestHeaders.getFirstValue(acceptCase).equals("*/*")) {
+					StringBuffer plainBuffer = new StringBuffer();
+					representation = OcciCheck.checkContentType(requestHeaders,
+							plainBuffer, getResponse());
+					getResponse().setEntity(representation);
+
+					// Location Rendering in HTTP Header, not in body
+					setLocationRef((getRootRef().toString() + compute.getId()));
+					// set response status
+					getResponse().setStatus(Status.SUCCESS_OK);
+				}
+				else if (requestHeaders.getFirstValue(acceptCase).equals(
+						"text/occi")) {
 					// Generate header rendering
 					this.occiCheck.setHeaderRendering(null, compute,
 							buffer.toString(), null);
 					getResponse().setEntity(representation);
+
+					// Location Rendering in HTTP Header, not in body
+					setLocationRef((getRootRef().toString() + compute.getId()));
 					getResponse().setStatus(Status.SUCCESS_OK);
+				} else if (requestHeaders.getFirstValue(acceptCase).equals(
+						"text/uri-list")) {
+					getResponse().setEntity(representation);
+					getResponse().setStatus(Status.SUCCESS_OK,
+							getRootRef().toString() + compute.getId());
+				} else if (requestHeaders.getFirstValue(acceptCase).equals(
+						"text/plain")) {
+					// Generate header rendering
+					StringBuffer plainBuffer = new StringBuffer();
+					representation = OcciCheck.checkContentType(requestHeaders,
+							plainBuffer, getResponse());
+					getResponse().setEntity(representation);
+
+					// Location Rendering in HTTP Header, not in body
+					setLocationRef((getRootRef().toString() + compute.getId()));
+					// set response status
+					getResponse().setStatus(Status.SUCCESS_OK);
+				} else {
+					getResponse().setStatus(
+							Status.SERVER_ERROR_SERVICE_UNAVAILABLE,
+							"Unsupported media type");
 				}
-				// Location Rendering in HTTP Header, not in body
-				setLocationRef((getRootRef().toString() + compute.getId()));
-				representation = OcciCheck.checkContentType(requestHeaders,
-						buffer, getResponse());
-				getResponse().setEntity(representation);
-				// set response status
-				getResponse().setStatus(Status.SUCCESS_OK);
 				return Response.getCurrent().toString();
 			} else {
 				String[] splitURI = getReference().toString().split("\\/");
@@ -825,7 +867,9 @@ public class OcciRestCompute extends ServerResource {
 						buffer, getResponse());
 				// Check the accept header
 				if (requestHeaders.getFirstValue(acceptCase)
-						.equals("text/occi")) {
+						.equals("text/occi")
+						|| requestHeaders.getFirstValue("Content-Type").equals(
+								"text/occi")) {
 					// generate header rendering
 					this.occiCheck.setHeaderRendering(null, compute,
 							buffer.toString(), linkBuffer);
@@ -940,8 +984,7 @@ public class OcciRestCompute extends ServerResource {
 			getResponse().setStatus(Status.SUCCESS_OK);
 			return " ";
 		} catch (ResourceException e) {
-			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
-					e.toString());
+			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
 			if (e instanceof ResourceException) {
 				return e.getMessage();
 			}

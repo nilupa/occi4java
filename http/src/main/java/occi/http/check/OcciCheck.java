@@ -83,9 +83,9 @@ public class OcciCheck extends ServerResource {
 		}
 
 		if (string.contains("content-type")) {
-			caseMap.put("accept", "content-type");
+			caseMap.put("content-type", "content-type");
 		} else if (string.contains("Content-Type")) {
-			caseMap.put("accept", "Content-Type");
+			caseMap.put("content-type", "Content-Type");
 		}
 
 		// Comma-separated because the contains() Method of String matches also
@@ -230,7 +230,7 @@ public class OcciCheck extends ServerResource {
 		}
 
 		xOcciLocation.add("Category", category);
-		xOcciLocation.add("X-OCCI-Location", location);
+		//xOcciLocation.add("X-OCCI-Location", location);
 		xOcciLocation.add("Link",
 				"setHeaderRendering(LinkedList<Kind> queryKinds)");
 	}
@@ -315,9 +315,9 @@ public class OcciCheck extends ServerResource {
 			linkBuffer.append(link);
 		}
 
-		if (location.isEmpty()) {
-			xOcciLocation.add("X-OCCI-Location", location);
-		}
+//		if (location.isEmpty()) {
+//			xOcciLocation.add("X-OCCI-Location", location);
+//		}
 
 		//xOcciLocation.add("Link", linkBuffer.toString());
 		//xOcciLocation.add("Category", category);
@@ -410,7 +410,7 @@ public class OcciCheck extends ServerResource {
 		// xOcciLocation.add("Link", linkBuffer.toString());
 
 		xOcciLocation.add("Category", category);
-		xOcciLocation.add("X-OCCI-Location", location);
+		//xOcciLocation.add("X-OCCI-Location", location);
 		xOcciLocation.add("X-OCCI-Attribute", linkBuffer.toString().replace(
 				"X-OCCI-Attribute: ", ""));
 	}
