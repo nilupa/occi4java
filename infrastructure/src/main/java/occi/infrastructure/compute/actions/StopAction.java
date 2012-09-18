@@ -57,7 +57,6 @@ public class StopAction extends Action {
 	public enum Stop implements Method {
 		graceful, acpioff, poweroff
 	}
-
 	private Stop stop;
 	private HashSet<String> attributes = new HashSet<String>();
 

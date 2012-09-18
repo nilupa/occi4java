@@ -359,8 +359,11 @@ public class OcciRestCompute extends ServerResource {
 			LOGGER.debug("Current request: " + requestHeaders);
 			String attributeCase = OcciCheck.checkCaseSensitivity(
 					requestHeaders.toString()).get("x-occi-attribute");
-			String xocciattributes = requestHeaders.getValues(attributeCase)
-					.replace(",", " ");
+			String xocciattributes = null;
+			if (attributeCase != null) {
+				xocciattributes = requestHeaders.getValues(attributeCase)
+						.replace(",", " ");
+			}
 			String acceptCase = OcciCheck.checkCaseSensitivity(
 					requestHeaders.toString()).get("accept");
 			LOGGER.debug("Media-Type: "
@@ -368,39 +371,43 @@ public class OcciRestCompute extends ServerResource {
 			LOGGER.debug("getref getlastseg: "
 					+ getReference().getLastSegment());
 
-			OcciCheck.countColons(xocciattributes, 1);
+			if (xocciattributes != null) {
+				OcciCheck.countColons(xocciattributes, 1);
+			}
 
 			// split the single occi attributes and put it into a
 			// (key,value)
 			// map
-			LOGGER.debug("Raw X-OCCI Attributes: " + xocciattributes);
-			StringTokenizer xoccilist = new StringTokenizer(xocciattributes);
-			// HashMap<String, Object> xoccimap = new HashMap<String,
-			// Object>();
-			LOGGER.debug("Tokens in XOCCIList: " + xoccilist.countTokens());
-			while (xoccilist.hasMoreTokens()) {
-				String[] temp = xoccilist.nextToken().split("\\=");
-				if (temp[0] != null && temp[1] != null) {
-					String temp1 = temp[1].replace("\"", "");
-					LOGGER.debug(temp[0] + " " + temp1.trim()+ "\n");
-					xoccimap.put(temp[0], temp1.trim());
+			// LOGGER.debug("Raw X-OCCI Attributes: " + xocciattributes);
+			if (xocciattributes != null) {
+				StringTokenizer xoccilist = new StringTokenizer(xocciattributes);
+				// HashMap<String, Object> xoccimap = new HashMap<String,
+				// Object>();
+				LOGGER.debug("Tokens in XOCCIList: " + xoccilist.countTokens());
+				while (xoccilist.hasMoreTokens()) {
+					String[] temp = xoccilist.nextToken().split("\\=");
+					if (temp[0] != null && temp[1] != null) {
+						String temp1 = temp[1].replace("\"", "");
+						LOGGER.debug(temp[0] + " " + temp1.trim() + "\n");
+						xoccimap.put(temp[0], temp1.trim());
+					}
 				}
 			}
 			// Check if last part of the URI is not action
 			if (!getReference().toString().contains("action")) {
 				// put occi attributes into a buffer for the response
 				StringBuffer buffer = new StringBuffer();
-				buffer.append("occi.compute.architecture=").append(
-						xoccimap.get("occi.compute.architecture"));
-				buffer.append(" occi.compute.cores=").append(
-						xoccimap.get("occi.compute.cores"));
-				buffer.append(" occi.compute.hostname=").append(
-						xoccimap.get("occi.compute.hostname"));
-				buffer.append(" occi.compute.speed=").append(
-						xoccimap.get("occi.compute.speed"));
-				buffer.append(" occi.compute.memory=").append(
-						xoccimap.get("occi.compute.memory"));
-				buffer.append(" occi.compute.state=").append("inactive");
+				// buffer.append("occi.compute.architecture=").append(
+				// xoccimap.get("occi.compute.architecture"));
+				// buffer.append(" occi.compute.cores=").append(
+				// xoccimap.get("occi.compute.cores"));
+				// buffer.append(" occi.compute.hostname=").append(
+				// xoccimap.get("occi.compute.hostname"));
+				// buffer.append(" occi.compute.speed=").append(
+				// xoccimap.get("occi.compute.speed"));
+				// buffer.append(" occi.compute.memory=").append(
+				// xoccimap.get("occi.compute.memory"));
+				// buffer.append(" occi.compute.state=").append("inactive");
 
 				Set<String> set = new HashSet<String>();
 				set.add("summary: ");
@@ -411,18 +418,35 @@ public class OcciRestCompute extends ServerResource {
 				}
 				LOGGER.debug("Attribute set: " + set.toString());
 
+				String architecture = (String) xoccimap
+						.get("occi.compute.architecture");
+				if (architecture == null) {
+					architecture = "NOT_GIVEN";
+				}
+				int cores = -1;
+				String hostname = "NOT_GIVEN";
+				float speed = -1;
+				float memory = -1;
+				if (xoccimap.get("occi.compute.cores") != null) {
+					cores = Integer.parseInt((String) xoccimap
+							.get("occi.compute.cores"));
+				}
+				if (xoccimap.get("occi.compute.hostname") != null) {
+					hostname = (String) xoccimap.get("occi.compute.hostname");
+				}
+				if (xoccimap.get("occi.compute.speed") != null) {
+					speed = Float.parseFloat((String) xoccimap
+							.get("occi.compute.speed"));
+				}
+				if (xoccimap.get("occi.compute.speed") != null) {
+					memory = Float.parseFloat((String) xoccimap
+							.get("occi.compute.speed"));
+				}
+
 				// create new Compute instance with the given attributes
 				Compute compute = new Compute(
-						Architecture.valueOf((String) xoccimap
-								.get("occi.compute.architecture")),
-						Integer.parseInt((String) xoccimap
-								.get("occi.compute.cores")),
-						(String) xoccimap.get("occi.compute.hostname"),
-						Float.parseFloat((String) xoccimap
-								.get("occi.compute.speed")),
-						Float.parseFloat((String) xoccimap
-								.get("occi.compute.memory")), State.inactive,
-						set);
+						Architecture.valueOf(architecture), cores, hostname,
+						speed, memory, State.inactive, set);
 				createLinks(requestHeaders, compute, buffer);
 				createMixinsForOSTempletesAndSLA(requestHeaders, compute,
 						xoccimap, buffer);
@@ -440,24 +464,22 @@ public class OcciRestCompute extends ServerResource {
 						.append("/");
 				getRootRef().setPath(resource.toString());
 
-//				for (Mixin mixin : Mixin.getMixins()) {
-//					if (mixin.getEntities() != null) {
-//						if (mixin.getEntities().contains(compute)) {
-//							buffer.append(" ");
-//							buffer.append("Category: " + mixin.getTitle()
-//									+ "; scheme=\"" + mixin.getScheme()
-//									+ "\"; class=\"mixin\"");
-//						}
-//					}
-//				}
+				// for (Mixin mixin : Mixin.getMixins()) {
+				// if (mixin.getEntities() != null) {
+				// if (mixin.getEntities().contains(compute)) {
+				// buffer.append(" ");
+				// buffer.append("Category: " + mixin.getTitle()
+				// + "; scheme=\"" + mixin.getScheme()
+				// + "\"; class=\"mixin\"");
+				// }
+				// }
+				// }
 				LOGGER.debug("Compute Uuid: " + compute.getUuid());
 				LOGGER.debug("Compute Kind scheme: "
 						+ compute.getKind().getScheme());
 				// Check accept header
 				if (requestHeaders.getFirstValue(acceptCase)
-						.equals("text/occi")
-						|| requestHeaders.getFirstValue("content-type", true)
-								.equals("text/occi")) {
+						.equals("text/occi")) {
 					// Generate header rendering
 					this.occiCheck.setHeaderRendering(null, compute,
 							buffer.toString(), null);
@@ -470,7 +492,7 @@ public class OcciRestCompute extends ServerResource {
 						buffer, getResponse());
 				getResponse().setEntity(representation);
 				// set response status
-				getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
+				getResponse().setStatus(Status.SUCCESS_OK);
 				return Response.getCurrent().toString();
 			} else {
 				String[] splitURI = getReference().toString().split("\\/");
@@ -612,7 +634,8 @@ public class OcciRestCompute extends ServerResource {
 					} else {
 						getResponse()
 								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-						return "Invalid action type"+Response.getCurrent().toString();
+						return "Invalid action type"
+								+ Response.getCurrent().toString();
 					}
 				} else {
 					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
@@ -627,6 +650,9 @@ public class OcciRestCompute extends ServerResource {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
 			e.printStackTrace();
+			if (e instanceof ResourceException) {
+				return e.getMessage();
+			}
 			return "Invalid client request \n";
 		}
 	}
@@ -660,11 +686,17 @@ public class OcciRestCompute extends ServerResource {
 						.append(compute.getKind().getTerm())
 						.append(" scheme= ")
 						.append(compute.getKind().getScheme())
-						.append(" class=\"kind\";").append(" Architecture: ")
-						.append(compute.getArchitecture()).append(" Cores: ")
-						.append(compute.getCores()).append(" Hostname: ")
-						.append(compute.getHostname()).append(" Memory: ")
-						.append(compute.getMemory()).append(" Speed: ")
+						.append(" class=\"kind\";")
+						.append(" Architecture: ")
+						.append(compute.getArchitecture())
+						.append(" Cores: ")
+						.append(compute.getCores() == -1 ? "NOT_GIVEN"
+								: compute.getCores())
+						.append(" Hostname: ")
+						.append(compute.getHostname())
+						.append(" Memory: ")
+						.append(compute.getMemory() == -1 ? "NOT_GIVEN"
+								: compute.getMemory()).append(" Speed: ")
 						.append(compute.getSpeed()).append(" State: ")
 						.append(compute.getState());
 
@@ -728,6 +760,40 @@ public class OcciRestCompute extends ServerResource {
 											+ ipNetworkInterface
 													.getAllocation());
 						}
+
+					}
+					if (l instanceof StorageLink) {
+						StorageLink storageLink = (StorageLink) l;
+
+						linkBuffer.append("</");
+						linkBuffer.append(l.getLink().getKind().getTerm());
+						linkBuffer.append("/");
+						linkBuffer.append(l.getId());
+						linkBuffer.append(">; ");
+						linkBuffer.append("rel=\""
+								+ l.getLink().getKind().getScheme());
+						linkBuffer.append(l.getLink().getKind().getTerm());
+						linkBuffer.append("\"");
+						linkBuffer.append(" self=\"/link/");
+						linkBuffer.append("storage link/");
+						linkBuffer.append(storageLink.getId() + "\";");
+						linkBuffer.append(" category=\"");
+						linkBuffer.append(l.getLink().getKind().getScheme()
+								+ "storagelink\";");
+						linkBuffer.append(" occi.core.target=/"
+								+ storageLink.getTarget().getKind().getTerm()
+								+ "/" + storageLink.getTarget().getId());
+						linkBuffer.append(" occi.core.source=/"
+								+ storageLink.getLink().getKind().getTerm()
+								+ "/" + compute.getId());
+						linkBuffer.append(" occi.core.id="
+								+ storageLink.getId());
+						linkBuffer.append(" occi.storagrlink.deviceid= "
+								+ storageLink.getDeviceid());
+						linkBuffer.append(" occi.storagrlink.mountpoint= "
+								+ storageLink.getMountpoint());
+						linkBuffer.append(" occi.networkinterface.state="
+								+ storageLink.getState());
 
 					}
 					buffer.append(linkBuffer);
@@ -811,10 +877,13 @@ public class OcciRestCompute extends ServerResource {
 			e.printStackTrace();
 			getResponse().setStatus(Status.CLIENT_ERROR_NOT_FOUND);
 			return "UUID(" + UUID.fromString(getReference().getLastSegment())
-					+ ") not found! " + e.toString() + "\n";
+					+ ") not found. \n";
 		} catch (Exception e) {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
+			if (e instanceof ResourceException) {
+				return e.getMessage();
+			}
 			return "Invalid client request \n";
 		}
 	}
@@ -873,6 +942,9 @@ public class OcciRestCompute extends ServerResource {
 		} catch (ResourceException e) {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
+			if (e instanceof ResourceException) {
+				return e.getMessage();
+			}
 			return "Invalid client request \n";
 		}
 	}
@@ -979,6 +1051,9 @@ public class OcciRestCompute extends ServerResource {
 			LOGGER.error("Exception caught: " + e.toString());
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
+			if (e instanceof ResourceException) {
+				return e.getMessage();
+			}
 			return "Invalid client request \n";
 		}
 		return null;

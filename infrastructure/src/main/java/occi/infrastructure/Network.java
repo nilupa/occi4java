@@ -18,6 +18,7 @@
 
 package occi.infrastructure;
 
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -146,8 +147,18 @@ public class Network extends Resource {
 			SchemaViolationException {
 		super(links, attributes);
 		this.state = state;
+		this.vlan = vlan;
+		this.label = label;
 
 		networkList.put(UUID.fromString(getId().toString()), this);
+		
+		/*
+		 * set Category
+		 */
+		setKind(new Kind(actionSet, null, null, null, "compute", "Compute",
+				OcciConfig.getInstance().config.getString("occi.scheme")
+						+ "/infrastructure#", attributes));
+		getKind().setActionNames(actionNames);
 		generateActionNames();
 		generateAttributeList();
 	}

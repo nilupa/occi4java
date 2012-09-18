@@ -27,11 +27,14 @@ import java.util.UUID;
 
 import occi.config.OcciConfig;
 import occi.core.Kind;
+import occi.core.Link;
 import occi.core.Mixin;
 import occi.http.check.OcciCheck;
 import occi.infrastructure.Network;
 import occi.infrastructure.Network.State;
+import occi.infrastructure.links.IPNetworkInterface;
 import occi.infrastructure.links.NetworkInterface;
+import occi.infrastructure.links.StorageLink;
 import occi.infrastructure.network.actions.DownAction.Down;
 import occi.infrastructure.network.actions.UpAction.Up;
 
@@ -55,75 +58,161 @@ public class OcciRestNetwork extends ServerResource {
 
 	@Get
 	public String getOCCIRequest() {
-		// set occi version info
-		getServerInfo().setAgent(
-				OcciConfig.getInstance().config.getString("occi.version"));
+		Form requestHeaders = (Form) getRequest().getAttributes().get(
+				"org.restlet.http.headers");
+		String acceptCase = OcciCheck.checkCaseSensitivity(
+				requestHeaders.toString()).get("accept");
+		// put all attributes into a buffer for the response
 		StringBuffer buffer = new StringBuffer();
+		Representation representation = null;
 		if (!getReference().getLastSegment().equals("network")) {
+			OcciCheck.isUUID(getReference().getLastSegment());
+			// get the compute instance by the given UUID
+			Network network = Network.getNetworkList().get(
+					UUID.fromString(getReference().getLastSegment()));
 
-			/*
-			 * Print all properties of the kind instance
-			 */
-			for (Kind kind : Kind.getKinds()) {
-				if (kind != null && kind.getTerm().equals("network")) {
-					NetworkInterface networkinterface = NetworkInterface
-							.getNetworkInterfaceList().get(
-									UUID.fromString(getReference()
-											.getLastSegment().toString()));
-					if (networkinterface != null) {
-						buffer.append("Category: " + kind.getTerm() + ";");
-						buffer.append("\t\t scheme=\"" + kind.getScheme()
-								+ "\";");
-						buffer.append("\r\n");
-						buffer.append("\t\t class=\"kind\";");
-						buffer.append("\r\n");
-						buffer.append("X-OCCI-Attribute: ");
-						buffer.append("occi.network.interface="
-								+ networkinterface.getNetworkInterface());
-						buffer.append(" occi.network.mac="
-								+ networkinterface.getMac());
-						buffer.append(" occi.network.state="
-								+ networkinterface.getState());
-					}
-					buffer.append("Link: ");
-					// buffer.append(networkinterface.getLink());
-					// append related scheme to buffer, if kind has a related
-					// kind
-					if (kind.getRelated() != null) {
-						for (Kind related : kind.getRelated()) {
-							if (related != null) {
-								buffer.append("\t\t rel=" + related.getScheme()
-										+ ";\n");
-							}
+			// put all attributes into a buffer for the response
+			StringBuffer linkBuffer = new StringBuffer();
+			StringBuffer mixinBuffer = new StringBuffer();
+			// put all attributes into a buffer for the response
+			buffer.append(" Category: ")
+					.append(network.getKind().getTerm())
+					.append(" scheme= ")
+					.append(network.getKind().getScheme())
+					.append(" class=\"kind\";")
+					.append(" vlan: ")
+					.append(network.getVlan() == -1 ? "NOT_GIVEN" : network
+							.getVlan()).append(" label: ")
+					.append(network.getLabel()).append(" State: ")
+					.append(network.getState());
+
+			if (!network.getLinks().isEmpty()) {
+				linkBuffer.append(" Link: ");
+			}
+			for (Link l : network.getLinks()) {
+				if (l instanceof NetworkInterface) {
+					NetworkInterface networkInterface = (NetworkInterface) l;
+					IPNetworkInterface ipNetworkInterface = null;
+					for (Mixin mixin : Mixin.getMixins()) {
+						if (mixin instanceof IPNetworkInterface
+								&& mixin.getEntities() != null
+								&& mixin.getEntities().contains(
+										networkInterface)) {
+							ipNetworkInterface = (IPNetworkInterface) mixin;
 						}
 					}
-					buffer.append("\t\t attributes=\"");
-					if (kind.getAttributes() != null) {
-						for (String attribute : kind.getAttributes()) {
-							if (attribute != null) {
-								buffer.append(attribute + " ");
-							}
-						}
+					linkBuffer.append("</");
+					linkBuffer.append(l.getLink().getKind().getTerm());
+					linkBuffer.append("/");
+					linkBuffer.append(l.getId());
+					linkBuffer.append(">; ");
+					linkBuffer.append("rel=\""
+							+ l.getLink().getKind().getScheme());
+					linkBuffer.append(l.getLink().getKind().getTerm());
+					linkBuffer.append("\"");
+					linkBuffer.append(" self=\"/link/");
+					linkBuffer.append("networkinterface/");
+					linkBuffer.append(networkInterface.getId() + "\";");
+					linkBuffer.append(" category=\"");
+					linkBuffer.append(l.getLink().getKind().getScheme()
+							+ "networkinterface\";");
+					if (ipNetworkInterface != null) {
+						linkBuffer.append(" category=\"");
+						linkBuffer.append(ipNetworkInterface.getScheme()
+								+ "ipnetworkinterface\"");
 					}
-					buffer.append("\";\n");
-					buffer.append("\t\t actions=");
-					for (String actionName : kind.getActionNames()) {
-						if (actionName != null) {
-							buffer.append(actionName + " ");
-						}
+					linkBuffer.append(" occi.core.target=/"
+							+ networkInterface.getTarget().getKind().getTerm()
+							+ "/" + networkInterface.getTarget().getId());
+					linkBuffer.append(" occi.core.source=/"
+							+ networkInterface.getLink().getKind().getTerm()
+							+ "/" + network.getId());
+					linkBuffer.append(" occi.core.id="
+							+ networkInterface.getId());
+					linkBuffer.append(" occi.networkinterface.interface="
+							+ networkInterface.getNetworkInterface());
+					linkBuffer.append(" occi.networkinterface.mac="
+							+ networkInterface.getMac());
+					linkBuffer.append(" occi.networkinterface.state="
+							+ networkInterface.getState());
+					if (ipNetworkInterface != null) {
+						linkBuffer.append(" occi.networkinterface.address="
+								+ ipNetworkInterface.getIp());
+						linkBuffer.append(" occi.networkinterface.gateway="
+								+ ipNetworkInterface.getGateway());
+						linkBuffer.append(" occi.networkinterface.allocation="
+								+ ipNetworkInterface.getAllocation());
 					}
-					buffer.append(";");
-					buffer.append("\r\n");
-					buffer.append("\t\t location=/" + kind.getTerm() + "/;");
-					buffer.append("\r\n");
-					getResponse().setStatus(Status.SUCCESS_OK);
-					return buffer.toString();
+
+				}
+				if (l instanceof StorageLink) {
+					StorageLink storageLink = (StorageLink) l;
+
+					linkBuffer.append("</");
+					linkBuffer.append(l.getLink().getKind().getTerm());
+					linkBuffer.append("/");
+					linkBuffer.append(l.getId());
+					linkBuffer.append(">; ");
+					linkBuffer.append("rel=\""
+							+ l.getLink().getKind().getScheme());
+					linkBuffer.append(l.getLink().getKind().getTerm());
+					linkBuffer.append("\"");
+					linkBuffer.append(" self=\"/link/");
+					linkBuffer.append("storage link/");
+					linkBuffer.append(storageLink.getId() + "\";");
+					linkBuffer.append(" category=\"");
+					linkBuffer.append(l.getLink().getKind().getScheme()
+							+ "storagelink\";");
+					linkBuffer.append(" occi.core.target=/"
+							+ storageLink.getTarget().getKind().getTerm() + "/"
+							+ storageLink.getTarget().getId());
+					linkBuffer.append(" occi.core.source=/"
+							+ storageLink.getLink().getKind().getTerm() + "/"
+							+ network.getId());
+					linkBuffer.append(" occi.core.id=" + storageLink.getId());
+					linkBuffer.append(" occi.storagelink.deviceid="
+							+ storageLink.getDeviceid());
+					linkBuffer.append(" occi.storagelink.mountpoint="
+							+ storageLink.getMountpoint());
+					linkBuffer.append(" occi.networkinterface.state="
+							+ storageLink.getState());
+
+				}
+				buffer.append(linkBuffer);
+				LOGGER.debug("Links: " + linkBuffer.toString());
+			}
+			for (Mixin mixin : Mixin.getMixins()) {
+				if (mixin.getEntities() != null) {
+					if (mixin.getEntities().contains(network)) {
+						mixinBuffer.append(" ");
+						mixinBuffer.append("Category: " + mixin.getTitle()
+								+ "; scheme=\"" + mixin.getScheme()
+								+ "\"; class=\"mixin\"");
+					}
 				}
 			}
-
+			buffer.append(mixinBuffer);
+			LOGGER.debug("Mixin: " + mixinBuffer);
+			// access the request headers and get the Accept attribute
+			representation = OcciCheck.checkContentType(requestHeaders, buffer,
+					getResponse());
+			// Check the accept header
+			if (requestHeaders.getFirstValue(acceptCase).equals("text/occi")) {
+				// generate header rendering
+				this.occiCheck.setHeaderRendering(null, network,
+						buffer.toString(), linkBuffer);
+				// set right representation and status code
+				getResponse().setEntity(representation);
+				getResponse().setStatus(Status.SUCCESS_OK);
+				return " ";
+			}
+			// set right representation and status code
+			getResponse().setEntity(representation);
+			getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
+			return buffer.toString();
 		} else {
 			// access the request headers and get the X-OCCI-Attribute
-			Form requestHeaders = (Form) getRequest().getAttributes().get(
+			requestHeaders = (Form) getRequest().getAttributes().get(
 					"org.restlet.http.headers");
 			LOGGER.debug("Current request: " + requestHeaders);
 			/*
@@ -137,8 +226,8 @@ public class OcciRestNetwork extends ServerResource {
 				}
 				i++;
 
-				Representation representation = OcciCheck.checkContentType(
-						requestHeaders, buffer, getResponse());
+				representation = OcciCheck.checkContentType(requestHeaders,
+						buffer, getResponse());
 				if (representation.getMediaType().toString()
 						.equals("text/occi")) {
 					// Set Location Attribute
@@ -149,11 +238,10 @@ public class OcciRestNetwork extends ServerResource {
 				}
 			}
 			getResponse().setStatus(Status.SUCCESS_OK);
+			getResponse().setStatus(Status.SUCCESS_NO_CONTENT);
 			return buffer.toString();
 		}
 
-		getResponse().setStatus(Status.SUCCESS_NO_CONTENT);
-		return " ";
 	}
 
 	/**
@@ -214,8 +302,11 @@ public class OcciRestNetwork extends ServerResource {
 			LOGGER.debug("Current request: " + requestHeaders);
 			String attributeCase = OcciCheck.checkCaseSensitivity(
 					requestHeaders.toString()).get("x-occi-attribute");
-			String xocciattributes = requestHeaders.getValues(attributeCase)
-					.replace(",", " ");
+			String xocciattributes = "";
+			if (attributeCase != null) {
+				xocciattributes = requestHeaders.getValues(attributeCase)
+						.replace(",", " ");
+			}
 			LOGGER.debug("Media-Type: "
 					+ requestHeaders.getFirstValue("accept", true));
 
@@ -223,7 +314,7 @@ public class OcciRestNetwork extends ServerResource {
 
 			// split the single occi attributes and put it into a (key,value)
 			// map
-			LOGGER.debug("Raw X-OCCI Attributes: " + xocciattributes);
+			// LOGGER.debug("Raw X-OCCI Attributes: " + xocciattributes);
 			StringTokenizer xoccilist = new StringTokenizer(xocciattributes);
 			HashMap<String, Object> xoccimap = new HashMap<String, Object>();
 			LOGGER.debug("Tokens in XOCCIList: " + xoccilist.countTokens());
@@ -240,23 +331,31 @@ public class OcciRestNetwork extends ServerResource {
 			if (!getReference().toString().contains("action")) {
 				// put occi attributes into a buffer for the response
 				StringBuffer buffer = new StringBuffer();
-				buffer.append("occi.network.vlan=").append(
-						xoccimap.get("occi.network.vlan"));
-				buffer.append(" occi.network.label=").append(
-						xoccimap.get("occi.network.label"));
-				buffer.append(" occi.network.state=").append(
-						xoccimap.get("occi.network.state"));
+				// buffer.append("occi.network.vlan=").append(
+				// xoccimap.get("occi.network.vlan"));
+				// buffer.append(" occi.network.label=").append(
+				// xoccimap.get("occi.network.label"));
+				// buffer.append(" occi.network.state=").append(
+				// xoccimap.get("occi.network.state"));
 
 				Set<String> set = new HashSet<String>();
 				set.add("summary: ");
 				set.add(buffer.toString());
 				set.add(requestHeaders.getFirstValue("scheme"));
 
+				String label = "NOT_GIVEN";
+				int vlan = -1;
+				if (xoccimap.get("occi.network.label") != null) {
+					label = (String) xoccimap.get("occi.network.label");
+				}
+				if (xoccimap.get("occi.network.vlan") != null) {
+					vlan = Integer.parseInt((String) xoccimap
+							.get("occi.network.vlan"));
+				}
+
 				// create new Compute instance with the given attributes
-				Network network = new Network(State.inactive,
-						(String) xoccimap.get("occi.network.label"),
-						Integer.parseInt((String) xoccimap
-								.get("occi.network.vlan")), null, null);
+				Network network = new Network(State.inactive, label, vlan,
+						null, null);
 				network.setKind(new Kind(null, "network", "network", null));
 
 				StringBuffer resource = new StringBuffer();
@@ -270,12 +369,12 @@ public class OcciRestNetwork extends ServerResource {
 				getRootRef().setPath(resource.toString());
 
 				// check of the category
-				if (!"network".equalsIgnoreCase(xoccimap.get(
-						"occi.network.Category").toString())) {
-					throw new IllegalArgumentException(
-							"Illegal Category type: "
-									+ xoccimap.get("occi.network.Category"));
-				}
+				// if (!"network".equalsIgnoreCase(xoccimap.get(
+				// "occi.network.Category").toString())) {
+				// throw new IllegalArgumentException(
+				// "Illegal Category type: "
+				// + xoccimap.get("occi.network.Category"));
+				// }
 				for (Mixin mixin : Mixin.getMixins()) {
 					if (mixin.getEntities() != null) {
 						if (mixin.getEntities().contains(network)) {
@@ -302,7 +401,7 @@ public class OcciRestNetwork extends ServerResource {
 						buffer, getResponse());
 				getResponse().setEntity(representation);
 				// set response status
-				getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
+				getResponse().setStatus(Status.SUCCESS_OK);
 				return Response.getCurrent().toString();
 			} else {
 				String[] splitURI = getReference().toString().split("\\/");

@@ -27,10 +27,15 @@ import java.util.UUID;
 
 import occi.config.OcciConfig;
 import occi.core.Kind;
+import occi.core.Link;
 import occi.core.Mixin;
 import occi.http.check.OcciCheck;
+import occi.infrastructure.Network;
 import occi.infrastructure.Storage;
 import occi.infrastructure.Storage.State;
+import occi.infrastructure.links.IPNetworkInterface;
+import occi.infrastructure.links.NetworkInterface;
+import occi.infrastructure.links.StorageLink;
 import occi.infrastructure.storage.actions.BackupAction.Backup;
 import occi.infrastructure.storage.actions.OfflineAction.Offline;
 import occi.infrastructure.storage.actions.OnlineAction.Online;
@@ -63,56 +68,186 @@ public class OcciRestStorage extends ServerResource {
 
 	@Get
 	public String getOCCIRequest() {
-		// set occi version info
-		getServerInfo().setAgent(
-				OcciConfig.getInstance().config.getString("occi.version"));
+		Form requestHeaders = (Form) getRequest().getAttributes().get(
+				"org.restlet.http.headers");
+		String acceptCase = OcciCheck.checkCaseSensitivity(
+				requestHeaders.toString()).get("accept");
+		// put all attributes into a buffer for the response
 		StringBuffer buffer = new StringBuffer();
-		/*
-		 * Print all properties of the kind instance
-		 */
-		for (Kind kind : Kind.getKinds()) {
-			if (kind != null && kind.getTerm().equals("storage")) {
+		Representation representation = null;
+		if (!getReference().getLastSegment().equals("storage")) {
+			OcciCheck.isUUID(getReference().getLastSegment());
+			// get the compute instance by the given UUID
+			Storage storage = Storage.getStorageList().get(
+					UUID.fromString(getReference().getLastSegment()));
 
-				buffer.append("Category: " + kind.getTerm() + ";");
-				buffer.append("\t\t scheme=\"" + kind.getScheme() + "\";");
-				buffer.append("\r\n");
-				buffer.append("\t\t class=\"kind\";");
-				buffer.append("\r\n");
-				// append related scheme to buffer, if kind has a related kind
-				if (kind.getRelated() != null) {
-					for (Kind related : kind.getRelated()) {
-						if (related != null) {
-							buffer.append("\t\t rel=" + related.getScheme()
-									+ ";\n");
-						}
-					}
-				}
-				buffer.append("\t\t attributes=\"");
-				if (kind.getAttributes() != null) {
-					for (String attribute : kind.getAttributes()) {
-						if (attribute != null) {
-							buffer.append(attribute + " ");
-						}
-					}
-				}
-				buffer.append("\";\n");
-				buffer.append("\t\t actions=");
-				for (String actionName : kind.getActionNames()) {
-					if (actionName != null) {
-						buffer.append(actionName + " ");
-					}
-				}
-				buffer.append(";");
-				buffer.append("\r\n");
-				buffer.append("\t\t location=/" + kind.getTerm() + "/;");
-				buffer.append("\r\n");
-				getResponse().setStatus(Status.SUCCESS_OK);
-				return buffer.toString();
+			// put all attributes into a buffer for the response
+			StringBuffer linkBuffer = new StringBuffer();
+			StringBuffer mixinBuffer = new StringBuffer();
+			// put all attributes into a buffer for the response
+			buffer.append(" Category: ").append(storage.getKind().getTerm())
+					.append(" scheme= ").append(storage.getKind().getScheme())
+					.append(" class=\"kind\";").append(" size: ")
+					.append(storage.getSize()).append(" state: ")
+					.append(storage.getState());
+
+			if (!storage.getLinks().isEmpty()) {
+				linkBuffer.append(" Link: ");
 			}
+			for (Link l : storage.getLinks()) {
+				if (l instanceof NetworkInterface) {
+					NetworkInterface networkInterface = (NetworkInterface) l;
+					IPNetworkInterface ipNetworkInterface = null;
+					for (Mixin mixin : Mixin.getMixins()) {
+						if (mixin instanceof IPNetworkInterface
+								&& mixin.getEntities() != null
+								&& mixin.getEntities().contains(
+										networkInterface)) {
+							ipNetworkInterface = (IPNetworkInterface) mixin;
+						}
+					}
+					linkBuffer.append("</");
+					linkBuffer.append(l.getLink().getKind().getTerm());
+					linkBuffer.append("/");
+					linkBuffer.append(l.getId());
+					linkBuffer.append(">; ");
+					linkBuffer.append("rel=\""
+							+ l.getLink().getKind().getScheme());
+					linkBuffer.append(l.getLink().getKind().getTerm());
+					linkBuffer.append("\"");
+					linkBuffer.append(" self=\"/link/");
+					linkBuffer.append("networkinterface/");
+					linkBuffer.append(networkInterface.getId() + "\";");
+					linkBuffer.append(" category=\"");
+					linkBuffer.append(l.getLink().getKind().getScheme()
+							+ "networkinterface\";");
+					if (ipNetworkInterface != null) {
+						linkBuffer.append(" category=\"");
+						linkBuffer.append(ipNetworkInterface.getScheme()
+								+ "ipnetworkinterface\"");
+					}
+					linkBuffer.append(" occi.core.target=/"
+							+ networkInterface.getTarget().getKind().getTerm()
+							+ "/" + networkInterface.getTarget().getId());
+					linkBuffer.append(" occi.core.source=/"
+							+ networkInterface.getLink().getKind().getTerm()
+							+ "/" + storage.getId());
+					linkBuffer.append(" occi.core.id="
+							+ networkInterface.getId());
+					linkBuffer.append(" occi.networkinterface.interface="
+							+ networkInterface.getNetworkInterface());
+					linkBuffer.append(" occi.networkinterface.mac="
+							+ networkInterface.getMac());
+					linkBuffer.append(" occi.networkinterface.state="
+							+ networkInterface.getState());
+					if (ipNetworkInterface != null) {
+						linkBuffer.append(" occi.networkinterface.address="
+								+ ipNetworkInterface.getIp());
+						linkBuffer.append(" occi.networkinterface.gateway="
+								+ ipNetworkInterface.getGateway());
+						linkBuffer.append(" occi.networkinterface.allocation="
+								+ ipNetworkInterface.getAllocation());
+					}
+					if (l instanceof StorageLink) {
+						StorageLink storageLink = (StorageLink) l;
+
+						linkBuffer.append("</");
+						linkBuffer.append(l.getLink().getKind().getTerm());
+						linkBuffer.append("/");
+						linkBuffer.append(l.getId());
+						linkBuffer.append(">; ");
+						linkBuffer.append("rel=\""
+								+ l.getLink().getKind().getScheme());
+						linkBuffer.append(l.getLink().getKind().getTerm());
+						linkBuffer.append("\"");
+						linkBuffer.append(" self=\"/link/");
+						linkBuffer.append("storage link/");
+						linkBuffer.append(storageLink.getId() + "\";");
+						linkBuffer.append(" category=\"");
+						linkBuffer.append(l.getLink().getKind().getScheme()
+								+ "storagelink\";");
+						linkBuffer.append(" occi.core.target=/"
+								+ storageLink.getTarget().getKind().getTerm()
+								+ "/" + storageLink.getTarget().getId());
+						linkBuffer.append(" occi.core.source=/"
+								+ storageLink.getLink().getKind().getTerm()
+								+ "/" + storage.getId());
+						linkBuffer.append(" occi.core.id="
+								+ storageLink.getId());
+						linkBuffer.append(" occi.storagrlink.deviceid= "
+								+ storageLink.getDeviceid());
+						linkBuffer.append(" occi.storagrlink.mountpoint= "
+								+ storageLink.getMountpoint());
+						linkBuffer.append(" occi.networkinterface.state="
+								+ storageLink.getState());
+
+					}
+
+				}
+				buffer.append(linkBuffer);
+				LOGGER.debug("Links: " + linkBuffer.toString());
+			}
+			for (Mixin mixin : Mixin.getMixins()) {
+				if (mixin.getEntities() != null) {
+					if (mixin.getEntities().contains(storage)) {
+						mixinBuffer.append(" ");
+						mixinBuffer.append("Category: " + mixin.getTitle()
+								+ "; scheme=\"" + mixin.getScheme()
+								+ "\"; class=\"mixin\"");
+					}
+				}
+			}
+			buffer.append(mixinBuffer);
+			LOGGER.debug("Mixin: " + mixinBuffer);
+			// access the request headers and get the Accept attribute
+			representation = OcciCheck.checkContentType(requestHeaders, buffer,
+					getResponse());
+			// Check the accept header
+			if (requestHeaders.getFirstValue(acceptCase).equals("text/occi")) {
+				// generate header rendering
+				this.occiCheck.setHeaderRendering(null, storage,
+						buffer.toString(), linkBuffer);
+				// set right representation and status code
+				getResponse().setEntity(representation);
+				getResponse().setStatus(Status.SUCCESS_OK);
+				return " ";
+			}
+			// set right representation and status code
+			getResponse().setEntity(representation);
+			getResponse().setStatus(Status.SUCCESS_OK, buffer.toString());
+			return buffer.toString();
+		} else {
+			// access the request headers and get the X-OCCI-Attribute
+			requestHeaders = (Form) getRequest().getAttributes().get(
+					"org.restlet.http.headers");
+			LOGGER.debug("Current request: " + requestHeaders);
+			/*
+			 * Print all properties of the kind instance
+			 */
+			int i = 1;
+			for (UUID uuid : Network.getNetworkList().keySet()) {
+				buffer.append(getRootRef() + "/" + uuid.toString());
+				if (i < Network.getNetworkList().size()) {
+					buffer.append(",");
+				}
+				i++;
+
+				representation = OcciCheck.checkContentType(requestHeaders,
+						buffer, getResponse());
+				if (representation.getMediaType().toString()
+						.equals("text/occi")) {
+					// Set Location Attribute
+					setLocationRef(buffer.toString());
+					// return http status code
+					getResponse().setStatus(Status.SUCCESS_OK, " ");
+					return " ";
+				}
+			}
+			getResponse().setStatus(Status.SUCCESS_OK);
+			getResponse().setStatus(Status.SUCCESS_NO_CONTENT);
+			return buffer.toString();
 		}
 
-		getResponse().setStatus(Status.SUCCESS_NO_CONTENT);
-		return " ";
 	}
 
 	/**

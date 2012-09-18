@@ -45,11 +45,12 @@ import org.springframework.core.io.ClassPathResource;
  * @author Sebastian Laag
  */
 public class Compute extends Resource {
+	
 	/**
 	 * Enumeration for CPU Architecture of the instance
 	 */
 	public enum Architecture {
-		x86, x64
+		x86, x64, NOT_GIVEN
 	}
 
 	/**
@@ -130,6 +131,9 @@ public class Compute extends Resource {
 			throws URISyntaxException, NumberFormatException,
 			IllegalArgumentException, NamingException {
 		super("Compute", links, attributes);
+		if(architecture.equals("NOT_GIVEN")){
+			this.architecture = null;
+		}
 		this.architecture = architecture;
 		this.cores = cores;
 		this.hostname = hostname;
@@ -140,18 +144,18 @@ public class Compute extends Resource {
 		generateActionNames();
 
 		// check if all attributes are correct
-		if ((cores < 1)) {
-			throw new NumberFormatException("Number of cores should not be less than 1!");
-		} else if (speed < 0) {
-			throw new NumberFormatException("Number of speed is negative!");
-		} else if (memory < 0) {
-			throw new NumberFormatException("Number of memory is negative!");
-		}
-		// check if there is a hostname
-		if (hostname.length() == 0) {
-			throw new NamingException(
-					"Name of the Compute resource can not be null");
-		}
+//		if ((cores < 1)) {
+//			throw new NumberFormatException("Number of cores should not be less than 1!");
+//		} else if (speed < 0) {
+//			throw new NumberFormatException("Number of speed is negative!");
+//		} else if (memory < 0) {
+//			throw new NumberFormatException("Number of memory is negative!");
+//		}
+//		// check if there is a hostname
+//		if (hostname.length() == 0) {
+//			throw new NamingException(
+//					"Name of the Compute resource can not be null");
+//		}
 		/*
 		 * set Category
 		 */

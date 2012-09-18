@@ -52,7 +52,7 @@ public class occiApi extends ServerResource {
 		comp.getDefaultHost().attach("/compute/{uuid}", OcciRestCompute.class);
 
 		// Returns all compute instances
-		comp.getDefaultHost().attach("/compute/", OcciRestComputes.class);
+		//comp.getDefaultHost().attach("/compute/", OcciRestComputes.class);
 
 		// Router for storage instances
 		comp.getDefaultHost().attach("/storage", OcciRestStorage.class);
