@@ -48,7 +48,7 @@ public class occiApi extends ServerResource {
 		comp.getDefaultHost().attach("/-/", OcciRestQuery.class);
 
 		// Returns one single instance of a compute resource
-		comp.getDefaultHost().attach("/compute", OcciRestCompute.class);
+		comp.getDefaultHost().attach("/compute/", OcciRestCompute.class);
 		comp.getDefaultHost().attach("/compute/{uuid}", OcciRestCompute.class);
 
 		// Returns all compute instances

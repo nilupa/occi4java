@@ -319,9 +319,9 @@ public class OcciCheck extends ServerResource {
 			xOcciLocation.add("X-OCCI-Location", location);
 		}
 
-		xOcciLocation.add("Link", linkBuffer.toString());
-		xOcciLocation.add("Category", category);
-		xOcciLocation.add("X-OCCI-Attribute", attributes);
+		//xOcciLocation.add("Link", linkBuffer.toString());
+		//xOcciLocation.add("Category", category);
+		//xOcciLocation.add("X-OCCI-Attribute", attributes);
 	}
 
 	/**

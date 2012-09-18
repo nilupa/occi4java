@@ -59,60 +59,97 @@ public class OcciRestNetwork extends ServerResource {
 		getServerInfo().setAgent(
 				OcciConfig.getInstance().config.getString("occi.version"));
 		StringBuffer buffer = new StringBuffer();
+		if (!getReference().getLastSegment().equals("network")) {
 
-		/*
-		 * Print all properties of the kind instance
-		 */
-		for (Kind kind : Kind.getKinds()) {
-			if (kind != null && kind.getTerm().equals("network")) {
-				NetworkInterface networkinterface = NetworkInterface
-						.getNetworkInterfaceList().get(
-								UUID.fromString(getReference().getLastSegment()
-										.toString()));
-				buffer.append("Category: " + kind.getTerm() + ";");
-				buffer.append("\t\t scheme=\"" + kind.getScheme() + "\";");
-				buffer.append("\r\n");
-				buffer.append("\t\t class=\"kind\";");
-				buffer.append("\r\n");
-				buffer.append("X-OCCI-Attribute: ");
-				buffer.append("occi.network.interface="
-						+ networkinterface.getNetworkInterface());
-				buffer.append(" occi.network.mac=" + networkinterface.getMac());
-				buffer.append(" occi.network.state="
-						+ networkinterface.getState());
-				buffer.append("Link: ");
-				// buffer.append(networkinterface.getLink());
-				// append related scheme to buffer, if kind has a related kind
-				if (kind.getRelated() != null) {
-					for (Kind related : kind.getRelated()) {
-						if (related != null) {
-							buffer.append("\t\t rel=" + related.getScheme()
-									+ ";\n");
+			/*
+			 * Print all properties of the kind instance
+			 */
+			for (Kind kind : Kind.getKinds()) {
+				if (kind != null && kind.getTerm().equals("network")) {
+					NetworkInterface networkinterface = NetworkInterface
+							.getNetworkInterfaceList().get(
+									UUID.fromString(getReference()
+											.getLastSegment().toString()));
+					if (networkinterface != null) {
+						buffer.append("Category: " + kind.getTerm() + ";");
+						buffer.append("\t\t scheme=\"" + kind.getScheme()
+								+ "\";");
+						buffer.append("\r\n");
+						buffer.append("\t\t class=\"kind\";");
+						buffer.append("\r\n");
+						buffer.append("X-OCCI-Attribute: ");
+						buffer.append("occi.network.interface="
+								+ networkinterface.getNetworkInterface());
+						buffer.append(" occi.network.mac="
+								+ networkinterface.getMac());
+						buffer.append(" occi.network.state="
+								+ networkinterface.getState());
+					}
+					buffer.append("Link: ");
+					// buffer.append(networkinterface.getLink());
+					// append related scheme to buffer, if kind has a related
+					// kind
+					if (kind.getRelated() != null) {
+						for (Kind related : kind.getRelated()) {
+							if (related != null) {
+								buffer.append("\t\t rel=" + related.getScheme()
+										+ ";\n");
+							}
 						}
 					}
-				}
-				buffer.append("\t\t attributes=\"");
-				if (kind.getAttributes() != null) {
-					for (String attribute : kind.getAttributes()) {
-						if (attribute != null) {
-							buffer.append(attribute + " ");
+					buffer.append("\t\t attributes=\"");
+					if (kind.getAttributes() != null) {
+						for (String attribute : kind.getAttributes()) {
+							if (attribute != null) {
+								buffer.append(attribute + " ");
+							}
 						}
 					}
-				}
-				buffer.append("\";\n");
-				buffer.append("\t\t actions=");
-				for (String actionName : kind.getActionNames()) {
-					if (actionName != null) {
-						buffer.append(actionName + " ");
+					buffer.append("\";\n");
+					buffer.append("\t\t actions=");
+					for (String actionName : kind.getActionNames()) {
+						if (actionName != null) {
+							buffer.append(actionName + " ");
+						}
 					}
+					buffer.append(";");
+					buffer.append("\r\n");
+					buffer.append("\t\t location=/" + kind.getTerm() + "/;");
+					buffer.append("\r\n");
+					getResponse().setStatus(Status.SUCCESS_OK);
+					return buffer.toString();
 				}
-				buffer.append(";");
-				buffer.append("\r\n");
-				buffer.append("\t\t location=/" + kind.getTerm() + "/;");
-				buffer.append("\r\n");
-				getResponse().setStatus(Status.SUCCESS_OK);
-				return buffer.toString();
 			}
+
+		} else {
+			// access the request headers and get the X-OCCI-Attribute
+			Form requestHeaders = (Form) getRequest().getAttributes().get(
+					"org.restlet.http.headers");
+			LOGGER.debug("Current request: " + requestHeaders);
+			/*
+			 * Print all properties of the kind instance
+			 */
+			int i = 1;
+			for (UUID uuid : Network.getNetworkList().keySet()) {
+				buffer.append(getRootRef() + "/" + uuid.toString());
+				if (i < Network.getNetworkList().size()) {
+					buffer.append(",");
+				}
+				i++;
+
+				Representation representation = OcciCheck.checkContentType(
+						requestHeaders, buffer, getResponse());
+				if (representation.getMediaType().toString()
+						.equals("text/occi")) {
+					// Set Location Attribute
+					setLocationRef(buffer.toString());
+					// return http status code
+					getResponse().setStatus(Status.SUCCESS_OK, " ");
+					return " ";
+				}
+			}
+			getResponse().setStatus(Status.SUCCESS_OK);
+			return buffer.toString();
 		}
 
 		getResponse().setStatus(Status.SUCCESS_NO_CONTENT);
@@ -193,8 +230,9 @@ public class OcciRestNetwork extends ServerResource {
 			while (xoccilist.hasMoreTokens()) {
 				String[] temp = xoccilist.nextToken().split("\\=");
 				if (temp[0] != null && temp[1] != null) {
-					LOGGER.debug(temp[0] + " " + temp[1] + "\n");
-					xoccimap.put(temp[0], temp[1]);
+					String temp1 = temp[1].replace("\"", "");
+					LOGGER.debug(temp[0] + " " + temp1.trim() + "\n");
+					xoccimap.put(temp[0], temp1.trim());
 				}
 			}
 
@@ -311,14 +349,13 @@ public class OcciRestNetwork extends ServerResource {
 								Down.valueOf((String) xoccimap.get("method")));
 						// Set the current state of the network resource
 						network.setState(State.inactive);
+					} else {
+						getResponse()
+								.setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+						return "Invalid action type"
+								+ Response.getCurrent().toString();
 					}
-					else{
-						getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-						return "Invalid action type"+Response.getCurrent().toString();
-					}
-				}
-				else
-				{
+				} else {
 					getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
 					return Response.getCurrent().toString();
 				}
@@ -329,7 +366,7 @@ public class OcciRestNetwork extends ServerResource {
 			e.printStackTrace();
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
-			return "Exception caught: " + e.toString() + "\n";
+			return "Invalid client request \n";
 		}
 	}
 

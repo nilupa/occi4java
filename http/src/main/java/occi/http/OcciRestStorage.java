@@ -189,8 +189,9 @@ public class OcciRestStorage extends ServerResource {
 			while (xoccilist.hasMoreTokens()) {
 				String[] temp = xoccilist.nextToken().split("\\=");
 				if (temp[0] != null && temp[1] != null) {
-					LOGGER.debug(temp[0] + " " + temp[1] + "\n");
-					xoccimap.put(temp[0], temp[1]);
+					String temp1 = temp[1].replace("\"", "");
+					LOGGER.debug(temp[0] + " " + temp1 + "\n");
+					xoccimap.put(temp[0], temp1);
 				}
 			}
 			// Check if last part of the URI is not action

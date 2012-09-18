@@ -381,8 +381,9 @@ public class OcciRestCompute extends ServerResource {
 			while (xoccilist.hasMoreTokens()) {
 				String[] temp = xoccilist.nextToken().split("\\=");
 				if (temp[0] != null && temp[1] != null) {
-					LOGGER.debug(temp[0] + " " + temp[1] + "\n");
-					xoccimap.put(temp[0], temp[1]);
+					String temp1 = temp[1].replace("\"", "");
+					LOGGER.debug(temp[0] + " " + temp1.trim()+ "\n");
+					xoccimap.put(temp[0], temp1.trim());
 				}
 			}
 			// Check if last part of the URI is not action
@@ -439,23 +440,16 @@ public class OcciRestCompute extends ServerResource {
 						.append("/");
 				getRootRef().setPath(resource.toString());
 
-				// check of the category
-				if (!"compute".equalsIgnoreCase(xoccimap.get(
-						"occi.compute.Category").toString())) {
-					throw new IllegalArgumentException(
-							"Illegal Category type: "
-									+ xoccimap.get("occi.compute.Category"));
-				}
-				for (Mixin mixin : Mixin.getMixins()) {
-					if (mixin.getEntities() != null) {
-						if (mixin.getEntities().contains(compute)) {
-							buffer.append(" ");
-							buffer.append("Category: " + mixin.getTitle()
-									+ "; scheme=\"" + mixin.getScheme()
-									+ "\"; class=\"mixin\"");
-						}
-					}
-				}
+//				for (Mixin mixin : Mixin.getMixins()) {
+//					if (mixin.getEntities() != null) {
+//						if (mixin.getEntities().contains(compute)) {
+//							buffer.append(" ");
+//							buffer.append("Category: " + mixin.getTitle()
+//									+ "; scheme=\"" + mixin.getScheme()
+//									+ "\"; class=\"mixin\"");
+//						}
+//					}
+//				}
 				LOGGER.debug("Compute Uuid: " + compute.getUuid());
 				LOGGER.debug("Compute Kind scheme: "
 						+ compute.getKind().getScheme());
@@ -633,7 +627,7 @@ public class OcciRestCompute extends ServerResource {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
 			e.printStackTrace();
-			return "Exception caught: " + e.toString() + "\n";
+			return "Invalid client request \n";
 		}
 	}
 
@@ -821,7 +815,7 @@ public class OcciRestCompute extends ServerResource {
 		} catch (Exception e) {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
-			return e.toString();
+			return "Invalid client request \n";
 		}
 	}
 
@@ -879,7 +873,7 @@ public class OcciRestCompute extends ServerResource {
 		} catch (ResourceException e) {
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
-			return "Exception caught :" + e.toString();
+			return "Invalid client request \n";
 		}
 	}
 
@@ -985,7 +979,7 @@ public class OcciRestCompute extends ServerResource {
 			LOGGER.error("Exception caught: " + e.toString());
 			getResponse().setStatus(Status.CLIENT_ERROR_BAD_REQUEST,
 					e.toString());
-			return "Exception: " + e.getMessage() + "\n";
+			return "Invalid client request \n";
 		}
 		return null;
 	}
